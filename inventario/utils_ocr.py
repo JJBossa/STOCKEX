@@ -1,26 +1,70 @@
 """
-Utilidades para procesamiento OCR de facturas
+Utilidades para procesamiento OCR de facturas chilenas
+Incluye preprocesamiento de imágenes para mejorar la precisión del OCR
 """
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import re
 from pdf2image import convert_from_path
 import io
 from django.conf import settings
 import os
+import numpy as np
 
 # Configurar ruta de Tesseract si es necesario (Windows)
+# Descomentar y ajustar la ruta según tu instalación:
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+def preprocesar_imagen(imagen):
+    """
+    Preprocesa una imagen para mejorar la precisión del OCR
+    
+    Args:
+        imagen: Objeto PIL Image
+    
+    Returns:
+        PIL Image: Imagen preprocesada
+    """
+    try:
+        # Convertir a escala de grises si es necesario
+        if imagen.mode != 'L':
+            imagen = imagen.convert('L')
+        
+        # Aumentar contraste
+        enhancer = ImageEnhance.Contrast(imagen)
+        imagen = enhancer.enhance(2.0)
+        
+        # Aumentar nitidez
+        enhancer = ImageEnhance.Sharpness(imagen)
+        imagen = enhancer.enhance(2.0)
+        
+        # Aplicar filtro para reducir ruido
+        imagen = imagen.filter(ImageFilter.MedianFilter(size=3))
+        
+        # Redimensionar si es muy pequeña (mínimo 300 DPI equivalente)
+        width, height = imagen.size
+        if width < 1200 or height < 1200:
+            # Escalar manteniendo proporción
+            factor = max(1200 / width, 1200 / height)
+            new_width = int(width * factor)
+            new_height = int(height * factor)
+            imagen = imagen.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        return imagen
+    
+    except Exception as e:
+        print(f"Error en preprocesamiento: {str(e)}")
+        return imagen  # Retornar imagen original si hay error
 
 def procesar_imagen_ocr(archivo):
     """
-    Procesa una imagen o PDF y extrae texto usando OCR
+    Procesa una imagen o PDF y extrae texto usando OCR con preprocesamiento
     
     Args:
-        archivo: Archivo subido (imagen o PDF)
+        archivo: Archivo subido (imagen JPG/PNG o PDF)
     
     Returns:
-        str: Texto extraído
+        str: Texto extraído del OCR
     """
     try:
         # Si es PDF, convertir a imagen
@@ -34,14 +78,23 @@ def procesar_imagen_ocr(archivo):
                 for chunk in archivo.chunks():
                     f.write(chunk)
             
-            # Convertir PDF a imágenes
+            # Convertir PDF a imágenes con alta resolución
             images = convert_from_path(temp_path, dpi=300)
             
             # Extraer texto de todas las páginas
             texto_completo = []
             for img in images:
-                # Configurar OCR con mejor precisión
-                texto = pytesseract.image_to_string(img, lang='spa', config='--psm 6')
+                # Preprocesar imagen
+                img_procesada = preprocesar_imagen(img)
+                
+                # Configurar OCR con mejor precisión para facturas
+                # PSM 6 = Asume un bloque uniforme de texto
+                # PSM 11 = Sparse text (mejor para tablas)
+                texto = pytesseract.image_to_string(
+                    img_procesada, 
+                    lang='spa', 
+                    config='--psm 11 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÁÉÍÓÚáéíóúÑñ.,$:/- '
+                )
                 texto_completo.append(texto)
             
             # Limpiar archivo temporal
@@ -50,17 +103,34 @@ def procesar_imagen_ocr(archivo):
             
             return '\n'.join(texto_completo)
         
-        # Si es imagen, procesar directamente
+        # Si es imagen (JPG/PNG), procesar directamente
         else:
             archivo.seek(0)  # Volver al inicio del archivo
             imagen = Image.open(archivo)
-            # Configurar OCR con mejor precisión para imágenes
-            texto = pytesseract.image_to_string(imagen, lang='spa', config='--psm 6')
+            
+            # Preprocesar imagen para mejorar OCR
+            imagen_procesada = preprocesar_imagen(imagen)
+            
+            # Configurar OCR con mejor precisión para facturas
+            # PSM 11 funciona mejor para tablas y texto disperso
+            texto = pytesseract.image_to_string(
+                imagen_procesada, 
+                lang='spa', 
+                config='--psm 11 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÁÉÍÓÚáéíóúÑñ.,$:/- '
+            )
+            
             return texto
     
     except Exception as e:
         print(f"Error en OCR: {str(e)}")
-        return ""
+        # Intentar sin preprocesamiento como fallback
+        try:
+            archivo.seek(0)
+            imagen = Image.open(archivo)
+            texto = pytesseract.image_to_string(imagen, lang='spa', config='--psm 6')
+            return texto
+        except:
+            return ""
 
 def extraer_fecha(texto):
     """Extrae fecha del texto de la factura"""
@@ -122,23 +192,38 @@ def extraer_total(texto):
     
     return None
 
-def extraer_items_factura(texto, productos_existentes):
+def extraer_items_factura(texto, productos_existentes=None):
     """
-    Extrae items de la factura intentando coincidir con productos existentes
+    Extrae items de la factura chilena usando OCR y regex.
+    NO crea productos automáticamente, solo detecta items.
+    
+    Formato esperado de factura chilena:
+    - Código | Descripción | Cantidad | Precio Unit. | Subtotal
+    - O variaciones con números al inicio (código) seguido de texto y precios
     
     Args:
-        texto: Texto extraído de la factura
-        productos_existentes: QuerySet de productos existentes
+        texto: Texto extraído de la factura por OCR
+        productos_existentes: QuerySet de productos existentes (opcional, para matching)
     
     Returns:
-        list: Lista de diccionarios con items detectados
+        list: Lista de diccionarios con items detectados:
+            {
+                'nombre_producto': str,
+                'cantidad': int,
+                'precio_unitario': int,
+                'subtotal': int,
+                'producto': Producto o None,
+                'producto_coincidencia': bool,
+                'codigo': str (opcional)
+            }
     """
     items = []
     lineas = texto.split('\n')
     
-    # Crear diccionario de productos para búsqueda rápida
+    # Crear diccionario de productos para búsqueda rápida (si se proporcionan)
     productos_dict = {}
-    for producto in productos_existentes:
+    if productos_existentes:
+        for producto in productos_existentes:
         nombre_limpio = producto.nombre.lower().strip()
         productos_dict[nombre_limpio] = producto
         # También agregar variaciones (palabras clave)
