@@ -36,8 +36,8 @@ Este documento describe las variables de entorno necesarias para configurar la a
 
 ### SUPERUSER_USERNAME (Opcional)
 - **Descripción**: Username para el superusuario que se creará automáticamente
-- **Valor por defecto**: `admin`
-- **Ejemplo**: `admin`
+- **Valor por defecto**: `bossa`
+- **Ejemplo**: `bossa`
 
 ### SUPERUSER_EMAIL (Opcional)
 - **Descripción**: Email para el superusuario que se creará automáticamente
@@ -46,10 +46,27 @@ Este documento describe las variables de entorno necesarias para configurar la a
 
 ### SUPERUSER_PASSWORD (Recomendado)
 - **Descripción**: Password para el superusuario que se creará automáticamente
-- **Valor por defecto**: `admin123` (⚠️ NO usar en producción)
+- **Valor por defecto**: `bossa123` (⚠️ Cambia esto en producción)
 - **Recomendación**: **SIEMPRE** define esta variable en Render con una contraseña segura
 - **Ejemplo**: `MiPasswordSeguro123!`
 - **Nota**: Si no defines esta variable, se usará `admin123` por defecto. El comando `crear_superusuario` solo crea el usuario si no existe, por lo que es seguro ejecutarlo múltiples veces.
+
+### NORMAL_USER_USERNAME (Opcional)
+- **Descripción**: Username para el usuario normal (sin permisos de administrador) que se creará automáticamente
+- **Valor por defecto**: `user1`
+- **Ejemplo**: `user1`
+
+### NORMAL_USER_EMAIL (Opcional)
+- **Descripción**: Email para el usuario normal que se creará automáticamente
+- **Valor por defecto**: `usuario@example.com`
+- **Ejemplo**: `usuario@tudominio.com`
+
+### NORMAL_USER_PASSWORD (Recomendado)
+- **Descripción**: Password para el usuario normal que se creará automáticamente
+- **Valor por defecto**: `u.123456` (⚠️ Cambia esto en producción)
+- **Recomendación**: **SIEMPRE** define esta variable en Render con una contraseña segura
+- **Ejemplo**: `PasswordUsuario123!`
+- **Nota**: Si no defines esta variable, se usará `usuario123` por defecto. El comando `crear_usuario_normal` solo crea el usuario si no existe, por lo que es seguro ejecutarlo múltiples veces.
 
 ## Configuración en Render
 
@@ -66,12 +83,26 @@ Este documento describe las variables de entorno necesarias para configurar la a
 - `DEBUG=False` es esencial para seguridad en producción
 - **SUPERUSER_PASSWORD**: Define siempre esta variable en Render con una contraseña segura para evitar usar el valor por defecto
 
-## Creación Automática de Superusuario
+## Creación Automática de Usuarios
 
-El proyecto incluye un comando `crear_superusuario` que se ejecuta automáticamente durante el build. Este comando:
-- Crea un superusuario solo si no existe (es seguro ejecutarlo múltiples veces)
+El proyecto incluye dos comandos que se ejecutan automáticamente durante el build:
+
+### 1. Superusuario (Administrador)
+Comando `crear_superusuario` que:
+- Crea un superusuario con todos los permisos (incluye acceso al admin)
 - Usa las variables de entorno `SUPERUSER_USERNAME`, `SUPERUSER_EMAIL`, y `SUPERUSER_PASSWORD`
 - Si no defines `SUPERUSER_PASSWORD`, usa `admin123` por defecto (⚠️ cambia esto en producción)
+- Usuario por defecto: `admin` / Password: `admin123`
 
-**No necesitas crear el superusuario manualmente** - se crea automáticamente en cada deploy.
+### 2. Usuario Normal
+Comando `crear_usuario_normal` que:
+- Crea un usuario normal sin permisos de administrador (NO tiene acceso al admin)
+- Usa las variables de entorno `NORMAL_USER_USERNAME`, `NORMAL_USER_EMAIL`, y `NORMAL_USER_PASSWORD`
+- Si no defines `NORMAL_USER_PASSWORD`, usa `usuario123` por defecto (⚠️ cambia esto en producción)
+- Usuario por defecto: `usuario` / Password: `usuario123`
+
+**Ambos comandos:**
+- Solo crean usuarios si no existen (es seguro ejecutarlos múltiples veces)
+- Se ejecutan automáticamente durante cada deploy
+- No necesitas crear usuarios manualmente
 

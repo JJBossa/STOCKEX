@@ -16,7 +16,7 @@ class Command(BaseCommand):
         # Si no hay password en variables de entorno, usar un default
         # IMPORTANTE: En producción, SIEMPRE define SUPERUSER_PASSWORD
         if not password:
-            password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin123')
+            password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'bossa123')
             self.stdout.write(
                 self.style.WARNING(
                     '⚠️  No se encontró SUPERUSER_PASSWORD. Usando valor por defecto.\n'

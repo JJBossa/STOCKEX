@@ -16,12 +16,20 @@ services:
       - key: ALLOWED_HOSTS
         value: control-stock.onrender.com
       # Opcional: Configurar credenciales del superusuario (se crea automáticamente)
-      # Si no defines estas, se usarán los valores por defecto (admin/admin123)
+      # Si no defines estas, se usarán los valores por defecto (bossa/bossa123)
       - key: SUPERUSER_USERNAME
-        value: admin
+        value: bossa
       - key: SUPERUSER_EMAIL
         value: admin@example.com
       - key: SUPERUSER_PASSWORD
+        sync: false  # IMPORTANTE: Define esto manualmente con una contraseña segura
+      # Opcional: Configurar credenciales del usuario normal (se crea automáticamente)
+      # Si no defines estas, se usarán los valores por defecto (user1/u.123456)
+      - key: NORMAL_USER_USERNAME
+        value: user1
+      - key: NORMAL_USER_EMAIL
+        value: usuario@example.com
+      - key: NORMAL_USER_PASSWORD
         sync: false  # IMPORTANTE: Define esto manualmente con una contraseña segura
     healthCheckPath: /
     # Nota: Necesitarás conectar manualmente la base de datos como dependencia
