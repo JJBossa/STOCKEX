@@ -98,7 +98,15 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'    # Para producción (collectstatic)
 - Instala dependencias Python
 - Recolecta archivos estáticos (`collectstatic`)
 - Ejecuta migraciones de base de datos
+- **Crea superusuario automáticamente** (sin necesidad de shell)
 - Incluye opción comentada para instalar Tesseract OCR
+
+### 1.1. **inventario/management/commands/crear_superusuario.py**
+**Propósito:** Comando personalizado que crea el superusuario automáticamente
+**Funcionalidad:**
+- Crea superusuario usando variables de entorno
+- Solo crea si no existe (seguro ejecutar múltiples veces)
+- Funciona sin shell interactivo (perfecto para plan free de Render)
 
 ### 2. **render.yaml** (opcional)
 **Propósito:** Configuración declarativa para Render
@@ -219,22 +227,18 @@ Si Render detecta `render.yaml`, puedes:
 
 ### 6. Después del Primer Deploy
 
-1. **Ejecutar migraciones** (si no se ejecutaron automáticamente):
-   - Abre la consola shell del servicio en Render
-   ```bash
-   python manage.py migrate
-   ```
+**✅ Todo es automático!** No necesitas hacer nada manualmente.
 
-2. **Crear superusuario:**
-   ```bash
-   python manage.py createsuperuser
-   ```
+El superusuario se crea automáticamente durante el build. Por defecto usa:
+- **Username**: `admin`
+- **Password**: `admin123`
 
-3. **Opcional: Comandos iniciales:**
-   ```bash
-   python manage.py crear_categorias
-   python manage.py importar_productos
-   ```
+⚠️ **IMPORTANTE**: Para producción, define `SUPERUSER_PASSWORD` en las variables de entorno con una contraseña segura.
+
+**Para personalizar las credenciales**, agrega estas variables de entorno en Render:
+- `SUPERUSER_USERNAME` (default: `admin`)
+- `SUPERUSER_EMAIL` (default: `admin@example.com`)
+- `SUPERUSER_PASSWORD` (default: `admin123` - **cambia esto!**)
 
 ---
 

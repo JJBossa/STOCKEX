@@ -15,3 +15,7 @@ python manage.py collectstatic --no-input --clear
 # Ejecutar migraciones
 python manage.py migrate --no-input
 
+# Crear superusuario automáticamente (si no existe)
+# Usa variables de entorno: SUPERUSER_USERNAME, SUPERUSER_EMAIL, SUPERUSER_PASSWORD
+python manage.py crear_superusuario
+

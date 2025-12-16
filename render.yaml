@@ -15,6 +15,14 @@ services:
       # IMPORTANTE: Actualiza ALLOWED_HOSTS con tu URL real de Render
       - key: ALLOWED_HOSTS
         value: control-stock.onrender.com
+      # Opcional: Configurar credenciales del superusuario (se crea automáticamente)
+      # Si no defines estas, se usarán los valores por defecto (admin/admin123)
+      - key: SUPERUSER_USERNAME
+        value: admin
+      - key: SUPERUSER_EMAIL
+        value: admin@example.com
+      - key: SUPERUSER_PASSWORD
+        sync: false  # IMPORTANTE: Define esto manualmente con una contraseña segura
     healthCheckPath: /
     # Nota: Necesitarás conectar manualmente la base de datos como dependencia
     # en el dashboard de Render, o usar la URL de la base de datos en DATABASE_URL

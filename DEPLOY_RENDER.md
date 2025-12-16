@@ -77,26 +77,26 @@ Si prefieres usar el archivo `render.yaml` incluido en el proyecto:
 2. Render comenzará a construir y desplegar tu aplicación
 3. Puedes ver el progreso en los logs
 
-### 7. Ejecutar Migraciones y Crear Superusuario
+### 7. Configurar Variables de Entorno para Superusuario (Opcional pero Recomendado)
 
-Una vez que el servicio esté desplegado:
+El proyecto crea automáticamente un superusuario durante el build. Para personalizarlo, agrega estas variables de entorno:
 
-1. Abre la consola del servicio web en Render (shell)
-2. Ejecuta las migraciones (si no se ejecutaron automáticamente):
-   ```bash
-   python manage.py migrate
-   ```
-3. Crea un superusuario:
-   ```bash
-   python manage.py createsuperuser
-   ```
+- **SUPERUSER_USERNAME**: Username del superusuario (default: `admin`)
+- **SUPERUSER_EMAIL**: Email del superusuario (default: `admin@example.com`)
+- **SUPERUSER_PASSWORD**: Password del superusuario (**IMPORTANTE**: Define esto con una contraseña segura)
 
-### 8. Configurar Comandos Iniciales (Opcional)
+Si no defines `SUPERUSER_PASSWORD`, se usará `admin123` por defecto. **¡Cambia esto en producción!**
 
-Si necesitas ejecutar comandos personalizados como crear categorías o importar productos:
+### 8. Verificar el Deploy
 
-1. Usa la consola shell de Render
-2. O agrega estos comandos al `build.sh` si quieres que se ejecuten automáticamente durante el build
+Una vez desplegado, verifica:
+
+1. El servicio web está "Live" (estado verde)
+2. Puedes acceder a tu URL de Render
+3. Puedes hacer login con las credenciales del superusuario
+4. Puedes acceder al admin en `/admin/`
+
+**Nota**: Las migraciones y creación de superusuario se ejecutan automáticamente durante el build, no necesitas hacerlo manualmente.
 
 ## Archivos Estáticos y Media
 
