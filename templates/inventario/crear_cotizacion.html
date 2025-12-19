@@ -106,7 +106,21 @@
         
         <div class="mb-3">
             <label class="form-label">Cliente *</label>
-            <input type="text" class="form-control" id="cliente-nombre" required placeholder="Nombre del cliente">
+            <select class="form-select mb-2" id="cliente-select" onchange="cargarDatosCliente()">
+                <option value="">Seleccionar cliente existente...</option>
+                {% for cliente in clientes %}
+                <option value="{{ cliente.id }}" 
+                        data-nombre="{{ cliente.nombre }}"
+                        data-contacto="{{ cliente.contacto|default:'' }}"
+                        data-telefono="{{ cliente.telefono|default:'' }}"
+                        data-email="{{ cliente.email|default:'' }}">
+                    {{ cliente.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+            <small class="text-muted">O ingresa manualmente:</small>
+            <input type="text" class="form-control mt-1" id="cliente-nombre" placeholder="Nombre del cliente" onchange="limpiarClienteSelect()">
+            <input type="hidden" id="cliente-id" name="cliente_id">
         </div>
         
         <div class="row mb-3">
@@ -300,6 +314,7 @@ function limpiarFormulario() {
     
     itemsCotizacion = [];
     actualizarItems();
+    document.getElementById('cliente-select').value = '';
     document.getElementById('cliente-nombre').value = '';
     document.getElementById('cliente-contacto').value = '';
     document.getElementById('cliente-telefono').value = '';
@@ -349,7 +364,9 @@ function crearCotizacion() {
     const total = Math.max(0, subtotal - descuento);
     
     const formData = new FormData();
+    const clienteId = document.getElementById('cliente-select').value;
     formData.append('items', JSON.stringify(itemsCotizacion));
+    formData.append('cliente_id', clienteId || '');
     formData.append('cliente_nombre', clienteNombre);
     formData.append('cliente_contacto', document.getElementById('cliente-contacto').value);
     formData.append('cliente_telefono', document.getElementById('cliente-telefono').value);
@@ -377,6 +394,26 @@ function crearCotizacion() {
         } else {
             alert('Error: ' + (data.error || 'No se pudo crear la cotización'));
         }
+    });
+}
+
+function cargarDatosCliente() {
+    const select = document.getElementById('cliente-select');
+    const option = select.options[select.selectedIndex];
+    if (option.value) {
+        document.getElementById('cliente-nombre').value = option.dataset.nombre || '';
+        document.getElementById('cliente-contacto').value = option.dataset.contacto || '';
+        document.getElementById('cliente-telefono').value = option.dataset.telefono || '';
+        document.getElementById('cliente-email').value = option.dataset.email || '';
+        document.getElementById('cliente-id').value = option.value;
+    }
+}
+
+function limpiarClienteSelect() {
+    if (document.getElementById('cliente-nombre').value) {
+        document.getElementById('cliente-select').value = '';
+        document.getElementById('cliente-id').value = '';
+    }
     })
     .catch(error => {
         console.error('Error:', error);

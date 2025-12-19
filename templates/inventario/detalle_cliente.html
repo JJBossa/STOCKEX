@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ cliente.nombre }} - STOCKEX{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2><i class="bi bi-person-badge"></i> {{ cliente.nombre }}</h2>
+    <div class="d-flex gap-2">
+        {% if es_admin %}
+        <a href="{% url 'editar_cliente' cliente.id %}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Editar
+        </a>
+        <a href="{% url 'crear_cuenta_cobrar_cliente' cliente.id %}" class="btn btn-outline-success">
+            <i class="bi bi-plus-circle"></i> Nueva Cuenta
+        </a>
+        {% endif %}
+        <a href="{% url 'listar_clientes' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>RUT:</strong> {{ cliente.rut|default:"No especificado" }}</p>
+                <p><strong>Tipo:</strong> {{ cliente.get_tipo_cliente_display }}</p>
+                <p><strong>Email:</strong> {{ cliente.email|default:"No especificado" }}</p>
+                <p><strong>Teléfono:</strong> {{ cliente.telefono|default:"No especificado" }}</p>
+                {% if cliente.direccion %}
+                <p><strong>Dirección:</strong> {{ cliente.direccion }}</p>
+                {% endif %}
+                {% if cliente.contacto %}
+                <p><strong>Contacto:</strong> {{ cliente.contacto }}</p>
+                {% endif %}
+                <p><strong>Límite Crédito:</strong> ${{ cliente.limite_credito|floatformat:0 }}</p>
+                <p><strong>Estado:</strong> 
+                    {% if cliente.activo %}
+                    <span class="badge bg-success">Activo</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Inactivo</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Estadísticas</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Total Compras:</strong> ${{ total_ventas|floatformat:0 }}</p>
+                <p><strong>Cantidad Ventas:</strong> {{ cantidad_ventas }}</p>
+                {% if saldo_pendiente > 0 %}
+                <p class="text-danger"><strong>Saldo Pendiente:</strong> ${{ saldo_pendiente|floatformat:0 }}</p>
+                {% else %}
+                <p><strong>Saldo Pendiente:</strong> $0</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#ventas">Ventas</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#cuentas">Cuentas por Cobrar</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="ventas">
+                <div class="card">
+                    <div class="card-body">
+                        {% if ventas %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Número</th>
+                                        <th>Fecha</th>
+                                        <th>Total</th>
+                                        <th>Método</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for venta in ventas %}
+                                    <tr>
+                                        <td>{{ venta.numero_venta }}</td>
+                                        <td>{{ venta.fecha|date:"d/m/Y H:i" }}</td>
+                                        <td>${{ venta.total|floatformat:0 }}</td>
+                                        <td>{{ venta.get_metodo_pago_display }}</td>
+                                        <td>
+                                            <a href="{% url 'detalle_venta' venta.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No hay ventas registradas.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="cuentas">
+                <div class="card">
+                    <div class="card-body">
+                        {% if cuentas_por_cobrar %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Documento</th>
+                                        <th>Monto</th>
+                                        <th>Pagado</th>
+                                        <th>Saldo</th>
+                                        <th>Vencimiento</th>
+                                        <th>Estado</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for cuenta in cuentas_por_cobrar %}
+                                    <tr>
+                                        <td>{{ cuenta.numero_documento }}</td>
+                                        <td>${{ cuenta.monto_total|floatformat:0 }}</td>
+                                        <td>${{ cuenta.monto_pagado|floatformat:0 }}</td>
+                                        <td>${{ cuenta.saldo_pendiente|floatformat:0 }}</td>
+                                        <td>{{ cuenta.fecha_vencimiento|date:"d/m/Y" }}</td>
+                                        <td>
+                                            {% if cuenta.esta_vencida %}
+                                            <span class="badge bg-danger">Vencida</span>
+                                            {% else %}
+                                            <span class="badge bg-{{ cuenta.estado|yesno:'success,warning,success,secondary' }}">{{ cuenta.get_estado_display }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'detalle_cuenta_cobrar' cuenta.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No hay cuentas por cobrar.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

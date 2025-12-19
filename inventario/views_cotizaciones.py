@@ -14,19 +14,21 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 import io
-from .models import Producto, Cotizacion, ItemCotizacion, Venta, ItemVenta, MovimientoStock
+from .models import Producto, Cotizacion, ItemCotizacion, Venta, ItemVenta, MovimientoStock, Cliente
 from .utils import es_admin_bossa, registrar_cambio
 
 @login_required
 def crear_cotizacion(request):
     """Vista para crear una nueva cotización"""
     productos = Producto.objects.filter(activo=True).order_by('nombre')
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre')
     
     if request.method == 'POST':
         try:
             import json
             items_data = json.loads(request.POST.get('items', '[]'))
-            cliente_nombre = request.POST.get('cliente_nombre', '').strip()
+            cliente_id = request.POST.get('cliente_id', '') or None
+            cliente_nombre = request.POST.get('cliente_nombre', '').strip()  # Legacy o nuevo cliente
             cliente_contacto = request.POST.get('cliente_contacto', '').strip()
             cliente_telefono = request.POST.get('cliente_telefono', '').strip()
             cliente_email = request.POST.get('cliente_email', '').strip()
@@ -35,6 +37,15 @@ def crear_cotizacion(request):
             descuento = Decimal(request.POST.get('descuento', '0'))
             total = Decimal(request.POST.get('total', '0'))
             notas = request.POST.get('notas', '')
+            
+            # Obtener o crear cliente
+            cliente = None
+            if cliente_id:
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, activo=True)
+                    cliente_nombre = cliente.nombre  # Usar nombre del cliente seleccionado
+                except Cliente.DoesNotExist:
+                    pass
             
             if not cliente_nombre:
                 return JsonResponse({'error': 'El nombre del cliente es requerido'}, status=400)
@@ -47,6 +58,7 @@ def crear_cotizacion(request):
             
             # Crear cotización
             cotizacion = Cotizacion.objects.create(
+                cliente=cliente,
                 usuario=request.user,
                 cliente_nombre=cliente_nombre,
                 cliente_contacto=cliente_contacto or None,

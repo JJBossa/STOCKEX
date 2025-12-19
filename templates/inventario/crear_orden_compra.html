@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}Crear Orden de Compra - STOCKEX{% endblock %}
+
+{% block extra_css %}
+<style>
+    .producto-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-cart-plus"></i> Crear Orden de Compra</h2>
+    <a href="{% url 'listar_ordenes_compra' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <form method="post" id="formOrdenCompra">
+            {% csrf_token %}
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Información de la Orden</h5>
+                            <div class="mb-3">
+                                <label class="form-label">Proveedor *</label>
+                                <select name="proveedor" class="form-select" required id="selectProveedor">
+                                    <option value="">Seleccionar proveedor...</option>
+                                    {% for p in proveedores %}
+                                    <option value="{{ p.id }}">{{ p.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Fecha Orden</label>
+                                    <input type="date" name="fecha_orden" class="form-control" value="{{ 'now'|date:'Y-m-d' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Fecha Esperada *</label>
+                                    <input type="date" name="fecha_esperada" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Notas</label>
+                                <textarea name="notas" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Agregar Productos</h5>
+                            <div class="mb-3">
+                                <label class="form-label">Producto</label>
+                                <select class="form-select" id="selectProducto">
+                                    <option value="">Seleccionar producto...</option>
+                                    {% for producto in productos %}
+                                    <option value="{{ producto.id }}" data-nombre="{{ producto.nombre }}" data-precio="{{ producto.precio_compra|default:producto.precio }}">{{ producto.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Cantidad</label>
+                                    <input type="number" class="form-control" id="inputCantidad" min="1" value="1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Precio Unitario</label>
+                                    <input type="number" class="form-control" id="inputPrecio" min="0" step="0.01">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary w-100" onclick="agregarProducto()">
+                                <i class="bi bi-plus-circle"></i> Agregar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Productos de la Orden</h5>
+                </div>
+                <div class="card-body">
+                    <div id="listaProductos">
+                        <p class="text-muted">No hay productos agregados</p>
+                    </div>
+                    <input type="hidden" name="items" id="itemsJson" value="[]">
+                </div>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Crear Orden
+                </button>
+                <a href="{% url 'listar_ordenes_compra' %}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let productos = [];
+let itemCounter = 0;
+
+function agregarProducto() {
+    const select = document.getElementById('selectProducto');
+    const cantidad = parseInt(document.getElementById('inputCantidad').value);
+    const precio = parseFloat(document.getElementById('inputPrecio').value);
+    
+    if (!select.value || !cantidad || !precio) {
+        alert('Completa todos los campos');
+        return;
+    }
+    
+    const option = select.options[select.selectedIndex];
+    const producto = {
+        id: itemCounter++,
+        producto_id: select.value,
+        nombre: option.dataset.nombre,
+        cantidad: cantidad,
+        precio_unitario: precio
+    };
+    
+    productos.push(producto);
+    actualizarLista();
+    select.value = '';
+    document.getElementById('inputCantidad').value = 1;
+    document.getElementById('inputPrecio').value = '';
+}
+
+function eliminarProducto(id) {
+    productos = productos.filter(p => p.id !== id);
+    actualizarLista();
+}
+
+function actualizarLista() {
+    const lista = document.getElementById('listaProductos');
+    const itemsJson = document.getElementById('itemsJson');
+    
+    if (productos.length === 0) {
+        lista.innerHTML = '<p class="text-muted">No hay productos agregados</p>';
+        itemsJson.value = '[]';
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table"><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Subtotal</th><th></th></tr></thead><tbody>';
+    productos.forEach(p => {
+        const subtotal = p.cantidad * p.precio_unitario;
+        html += `<tr>
+            <td>${p.nombre}</td>
+            <td>${p.cantidad}</td>
+            <td>$${p.precio_unitario.toLocaleString()}</td>
+            <td>$${subtotal.toLocaleString()}</td>
+            <td><button type="button" class="btn btn-sm btn-danger" onclick="eliminarProducto(${p.id})"><i class="bi bi-trash"></i></button></td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    lista.innerHTML = html;
+    itemsJson.value = JSON.stringify(productos);
+}
+
+document.getElementById('selectProducto').addEventListener('change', function() {
+    const option = this.options[this.selectedIndex];
+    if (option.value) {
+        document.getElementById('inputPrecio').value = option.dataset.precio || '';
+    }
+});
+</script>
+{% endblock %}
+

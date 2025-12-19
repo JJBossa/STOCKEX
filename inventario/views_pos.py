@@ -9,7 +9,7 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from datetime import timedelta
 from decimal import Decimal
-from .models import Producto, Venta, ItemVenta, MovimientoStock
+from .models import Producto, Venta, ItemVenta, MovimientoStock, Cliente, CuentaPorCobrar
 from .utils import es_admin_bossa, registrar_cambio, logger
 
 @login_required
@@ -19,8 +19,12 @@ def punto_venta(request):
     # Obtener productos activos para búsqueda
     productos = Producto.objects.filter(activo=True).order_by('nombre')
     
+    # Obtener clientes activos para selección
+    clientes = Cliente.objects.filter(activo=True).order_by('nombre')
+    
     context = {
         'productos': productos,
+        'clientes': clientes,
         'es_admin': es_admin_bossa(request.user),
     }
     
@@ -94,19 +98,33 @@ def procesar_venta(request):
         monto_recibido = Decimal(request.POST.get('monto_recibido', '0'))
         cambio = Decimal(request.POST.get('cambio', '0'))
         notas = request.POST.get('notas', '')
+        cliente_id = request.POST.get('cliente_id', '') or None
+        es_credito = request.POST.get('es_credito', 'false') == 'true'
         
         if not items_data:
             return JsonResponse({'error': 'No hay items en la venta'}, status=400)
         
+        # Validar cliente si es crédito
+        cliente = None
+        if es_credito:
+            if not cliente_id:
+                return JsonResponse({'error': 'Se debe seleccionar un cliente para ventas a crédito'}, status=400)
+            try:
+                cliente = Cliente.objects.get(id=cliente_id, activo=True)
+            except Cliente.DoesNotExist:
+                return JsonResponse({'error': 'Cliente no encontrado'}, status=400)
+        
         # Crear venta
         venta = Venta.objects.create(
+            cliente=cliente,
             usuario=request.user,
             subtotal=subtotal,
             descuento=descuento,
             total=total,
-            metodo_pago=metodo_pago,
+            metodo_pago=metodo_pago if not es_credito else 'credito',
             monto_recibido=monto_recibido,
             cambio=cambio,
+            es_credito=es_credito,
             notas=notas
         )
         
@@ -181,6 +199,21 @@ def procesar_venta(request):
                 f'Venta: {cantidad} unidades - Venta #{venta.numero_venta}'
             )
         
+        # Si es venta a crédito, crear cuenta por cobrar
+        if es_credito and cliente:
+            fecha_vencimiento = timezone.now().date() + timedelta(days=30)  # 30 días por defecto
+            
+            cuenta_por_cobrar = CuentaPorCobrar.objects.create(
+                cliente=cliente,
+                venta=venta,
+                monto_total=total,
+                fecha_emision=timezone.now().date(),
+                fecha_vencimiento=fecha_vencimiento,
+                notas=f'Venta #{venta.numero_venta}'
+            )
+            logger.info(f'Cuenta por cobrar creada para venta #{venta.numero_venta}', 
+                       extra={'user': request.user.username, 'cuenta_id': cuenta_por_cobrar.id})
+        
         logger.info(f'Venta #{venta.numero_venta} procesada exitosamente. Total: ${venta.total}',
                    extra={'user': request.user.username, 'venta_id': venta.id, 'total': float(venta.total)})
         
@@ -189,6 +222,7 @@ def procesar_venta(request):
             'venta_id': venta.id,
             'numero_venta': venta.numero_venta,
             'total': float(venta.total),
+            'es_credito': es_credito,
             'mensaje': f'Venta #{venta.numero_venta} procesada exitosamente'
         })
         

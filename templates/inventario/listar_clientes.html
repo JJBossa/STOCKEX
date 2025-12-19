@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Clientes - STOCKEX{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2><i class="bi bi-person-badge"></i> Clientes</h2>
+    {% if es_admin %}
+    <a href="{% url 'crear_cliente' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nuevo Cliente
+    </a>
+    {% endif %}
+</div>
+
+<!-- Búsqueda y Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <input type="text" name="q" class="form-control" placeholder="Buscar por nombre, RUT, email..." value="{{ query }}">
+            </div>
+            <div class="col-md-2">
+                <select name="tipo" class="form-select">
+                    <option value="">Todos los tipos</option>
+                    <option value="natural" {% if tipo_cliente == 'natural' %}selected{% endif %}>Persona Natural</option>
+                    <option value="empresa" {% if tipo_cliente == 'empresa' %}selected{% endif %}>Empresa</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="activo" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="1" {% if activo == '1' %}selected{% endif %}>Activos</option>
+                    <option value="0" {% if activo == '0' %}selected{% endif %}>Inactivos</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'listar_clientes' %}" class="btn btn-secondary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Clientes -->
+{% if clientes %}
+<div class="row">
+    {% for cliente in clientes %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100 {% if not cliente.activo %}opacity-75{% endif %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-{{ cliente.tipo_cliente|yesno:'building,person' }}"></i>
+                        {{ cliente.nombre }}
+                    </h5>
+                    {% if not cliente.activo %}
+                    <span class="badge bg-secondary">Inactivo</span>
+                    {% endif %}
+                </div>
+                <p class="text-muted small mb-2">
+                    {% if cliente.rut %}<i class="bi bi-credit-card"></i> {{ cliente.rut }}<br>{% endif %}
+                    {% if cliente.email %}<i class="bi bi-envelope"></i> {{ cliente.email }}<br>{% endif %}
+                    {% if cliente.telefono %}<i class="bi bi-telephone"></i> {{ cliente.telefono }}{% endif %}
+                </p>
+                <div class="d-flex justify-content-between text-muted small mb-3">
+                    <span><i class="bi bi-cart"></i> {{ cliente.cantidad_ventas }} ventas</span>
+                    <span><i class="bi bi-currency-dollar"></i> ${{ cliente.total_compras|floatformat:0 }}</span>
+                </div>
+                {% if cliente.saldo_pendiente > 0 %}
+                <div class="alert alert-warning py-2 mb-2">
+                    <small><i class="bi bi-exclamation-triangle"></i> Saldo pendiente: ${{ cliente.saldo_pendiente|floatformat:0 }}</small>
+                </div>
+                {% endif %}
+                <div class="d-flex gap-2">
+                    <a href="{% url 'detalle_cliente' cliente.id %}" class="btn btn-sm btn-outline-primary flex-fill">
+                        <i class="bi bi-eye"></i> Ver
+                    </a>
+                    {% if es_admin %}
+                    <a href="{% url 'editar_cliente' cliente.id %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Paginación -->
+{% if clientes.has_other_pages %}
+<nav aria-label="Paginación">
+    <ul class="pagination justify-content-center">
+        {% if clientes.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ clientes.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">Anterior</a>
+        </li>
+        {% endif %}
+        <li class="page-item active">
+            <span class="page-link">Página {{ clientes.number }} de {{ clientes.paginator.num_pages }}</span>
+        </li>
+        {% if clientes.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ clientes.next_page_number }}{% if query %}&q={{ query }}{% endif %}">Siguiente</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No se encontraron clientes.
+    {% if es_admin %}
+    <a href="{% url 'crear_cliente' %}" class="alert-link">Crear el primer cliente</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+

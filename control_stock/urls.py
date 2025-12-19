@@ -22,6 +22,8 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('inventario.urls')),
+    # API REST - Endpoints en paralelo (no reemplazan los existentes)
+    path('api/v1/', include('inventario.api_urls')),
 ]
 
 # Servir archivos media en desarrollo

@@ -25,6 +25,37 @@
                 <a href="{% url 'punto_venta' %}" class="btn btn-success btn-lg me-3" style="font-weight: 600; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
                     <i class="bi bi-cash-register"></i> Ventas
                 </a>
+                {% else %}
+                <!-- Menú Principal para Admin -->
+                <div class="dropdown me-2">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-grid-3x3-gap"></i> Menú
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">Ventas</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'punto_venta' %}"><i class="bi bi-cash-register text-success"></i> Punto de Venta</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_ventas' %}"><i class="bi bi-clock-history text-primary"></i> Historial</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_cotizaciones' %}"><i class="bi bi-file-earmark-text text-info"></i> Cotizaciones</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_cuentas_cobrar' %}"><i class="bi bi-credit-card text-danger"></i> Cuentas por Cobrar</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Inventario</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'agregar_producto' %}"><i class="bi bi-plus-circle text-primary"></i> Agregar Producto</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_almacenes' %}"><i class="bi bi-building text-secondary"></i> Almacenes</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_ordenes_compra' %}"><i class="bi bi-cart-check text-success"></i> Compras</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_movimientos' %}"><i class="bi bi-arrow-left-right text-info"></i> Movimientos</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Relaciones</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_clientes' %}"><i class="bi bi-person-badge text-primary"></i> Clientes</a></li>
+                        <li><a class="dropdown-item" href="{% url 'gestionar_proveedores' %}"><i class="bi bi-truck text-success"></i> Proveedores</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_facturas' %}"><i class="bi bi-receipt text-warning"></i> Facturas</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Sistema</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'reportes_avanzados' %}"><i class="bi bi-graph-up text-primary"></i> Reportes</a></li>
+                        <li><a class="dropdown-item" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 text-info"></i> Dashboard</a></li>
+                        <li><a class="dropdown-item" href="{% url 'listar_usuarios' %}"><i class="bi bi-people text-warning"></i> Usuarios</a></li>
+                        <li><a class="dropdown-item" href="{% url 'gestionar_categorias' %}"><i class="bi bi-tags text-secondary"></i> Categorías</a></li>
+                    </ul>
+                </div>
                 {% endif %}
                 <button class="btn btn-outline-light btn-sm me-2" id="dark-mode-toggle" title="Modo Oscuro/Claro">
                     <i class="bi bi-moon-stars" id="dark-mode-icon"></i>
@@ -35,7 +66,11 @@
                         <i class="bi bi-person-circle"></i> {{ user.username }}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
+                        {% if user.username == 'bossa' %}
+                        <li><a class="dropdown-item" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        {% else %}
                         <li><a class="dropdown-item" href="{% url 'dashboard_usuario' %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        {% endif %}
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'listar_ventas' %}"><i class="bi bi-clock-history text-primary"></i> Historial de Ventas</a></li>
                         <li><a class="dropdown-item" href="{% url 'listar_cotizaciones' %}"><i class="bi bi-file-earmark-text text-info"></i> Cotizaciones</a></li>
@@ -78,9 +113,10 @@
     <footer class="footer">
         <div class="container">
             <p>
-                <i class="bi bi-box-seam"></i> STOCKEX - Sistema de Gestión de Inventario
+                <i class="bi bi-box-seam"></i> STOCKEX - Sistema de Gestión de Inventario 
                 <br>
                 <small>© {% now "Y" %} - Todos los derechos reservados</small>
+                <small>- Creado por Juan Jose Bossa Canto</small>
             </p>
         </div>
     </footer>

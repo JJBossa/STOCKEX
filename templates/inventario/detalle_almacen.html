@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ almacen.nombre }} - STOCKEX{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2><i class="bi bi-building"></i> {{ almacen.nombre }}</h2>
+    <div class="d-flex gap-2">
+        {% if es_admin %}
+        <a href="{% url 'editar_almacen' almacen.id %}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Editar
+        </a>
+        {% endif %}
+        <a href="{% url 'listar_almacenes' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5>Información</h5>
+                <p><strong>Código:</strong> {{ almacen.codigo }}</p>
+                {% if almacen.direccion %}<p><strong>Dirección:</strong> {{ almacen.direccion }}</p>{% endif %}
+                {% if almacen.telefono %}<p><strong>Teléfono:</strong> {{ almacen.telefono }}</p>{% endif %}
+                {% if almacen.responsable %}<p><strong>Responsable:</strong> {{ almacen.responsable }}</p>{% endif %}
+                <p><strong>Estado:</strong> 
+                    {% if almacen.activo %}
+                    <span class="badge bg-success">Activo</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Inactivo</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5>Estadísticas</h5>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h3>{{ total_productos }}</h3>
+                        <small class="text-muted">Productos</small>
+                    </div>
+                    <div class="col-4">
+                        <h3 class="text-warning">{{ productos_stock_bajo }}</h3>
+                        <small class="text-muted">Stock Bajo</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <input type="text" name="q" class="form-control" placeholder="Buscar producto..." value="{{ query }}">
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" name="stock_bajo" value="1" id="stock_bajo" {% if stock_bajo == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="stock_bajo">Solo Stock Bajo</label>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'detalle_almacen' almacen.id %}" class="btn btn-secondary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Stock -->
+{% if stock_items %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>SKU</th>
+                <th>Cantidad</th>
+                <th>Stock Mínimo</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock_items %}
+            <tr class="{% if item.stock_bajo %}table-warning{% endif %}">
+                <td>{{ item.producto.nombre }}</td>
+                <td>{{ item.producto.sku|default:"-" }}</td>
+                <td><strong>{{ item.cantidad }}</strong></td>
+                <td>{{ item.stock_minimo }}</td>
+                <td>
+                    {% if item.stock_bajo %}
+                    <span class="badge bg-warning">Stock Bajo</span>
+                    {% else %}
+                    <span class="badge bg-success">OK</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Paginación -->
+{% if stock_items.has_other_pages %}
+<nav aria-label="Paginación">
+    <ul class="pagination justify-content-center">
+        {% if stock_items.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ stock_items.previous_page_number }}">Anterior</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">Página {{ stock_items.number }} de {{ stock_items.paginator.num_pages }}</span></li>
+        {% if stock_items.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ stock_items.next_page_number }}">Siguiente</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No hay productos en este almacén.
+</div>
+{% endif %}
+{% endblock %}
+

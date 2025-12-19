@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Almacenes - STOCKEX{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2><i class="bi bi-building"></i> Almacenes</h2>
+    {% if es_admin %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'crear_transferencia' %}" class="btn btn-success">
+            <i class="bi bi-arrow-left-right"></i> Nueva Transferencia
+        </a>
+        <a href="{% url 'crear_almacen' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuevo Almacén
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <select name="activo" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="1" {% if activo == '1' %}selected{% endif %}>Activos</option>
+                    <option value="0" {% if activo == '0' %}selected{% endif %}>Inactivos</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Filtrar
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'listar_almacenes' %}" class="btn btn-secondary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista -->
+{% if almacenes %}
+<div class="row">
+    {% for almacen in almacenes %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100 {% if not almacen.activo %}opacity-75{% endif %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-building"></i> {{ almacen.nombre }}
+                    </h5>
+                    {% if not almacen.activo %}
+                    <span class="badge bg-secondary">Inactivo</span>
+                    {% endif %}
+                </div>
+                <p class="text-muted small mb-2">
+                    <strong>Código:</strong> {{ almacen.codigo }}<br>
+                    {% if almacen.responsable %}<strong>Responsable:</strong> {{ almacen.responsable }}<br>{% endif %}
+                    {% if almacen.telefono %}<strong>Teléfono:</strong> {{ almacen.telefono }}{% endif %}
+                </p>
+                <div class="d-flex justify-content-between text-muted small mb-3">
+                    <span><i class="bi bi-box"></i> {{ almacen.productos_count|default:0 }} productos</span>
+                    {% if almacen.stock_bajo_count > 0 %}
+                    <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> {{ almacen.stock_bajo_count }} stock bajo</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'detalle_almacen' almacen.id %}" class="btn btn-sm btn-outline-primary flex-fill">
+                        <i class="bi bi-eye"></i> Ver Stock
+                    </a>
+                    {% if es_admin %}
+                    <a href="{% url 'editar_almacen' almacen.id %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No hay almacenes registrados.
+    {% if es_admin %}
+    <a href="{% url 'crear_almacen' %}" class="alert-link">Crear el primer almacén</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+

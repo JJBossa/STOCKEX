@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Recibir Mercancía - STOCKEX{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-box-arrow-in-down"></i> Recibir Mercancía - {{ orden.numero_orden }}</h2>
+    <a href="{% url 'detalle_orden_compra' orden.id %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-10 mx-auto">
+        <form method="post">
+            {% csrf_token %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Almacén de Recepción *</label>
+                            <select name="almacen" class="form-select" required>
+                                <option value="">Seleccionar almacén...</option>
+                                {% for almacen in almacenes %}
+                                <option value="{{ almacen.id }}">{{ almacen.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea name="notas" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Productos a Recibir</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Solicitado</th>
+                                    <th>Ya Recibido</th>
+                                    <th>Pendiente</th>
+                                    <th>Cantidad a Recibir *</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td>{{ item.producto.nombre }}</td>
+                                    <td>{{ item.cantidad }}</td>
+                                    <td>{{ item.cantidad_recibida }}</td>
+                                    <td>{{ item.cantidad|add:"-"|add:item.cantidad_recibida|add:"0" }}</td>
+                                    <td>
+                                        <input type="number" 
+                                               name="items" 
+                                               data-item-id="{{ item.id }}"
+                                               class="form-control cantidad-recibir" 
+                                               min="0" 
+                                               max="{{ item.cantidad|add:"-"|add:item.cantidad_recibida|add:"0" }}"
+                                               value="0">
+                                        <input type="hidden" name="items" value='{"item_id": {{ item.id }}, "cantidad_recibida": 0}'>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-circle"></i> Registrar Recepción
+                </button>
+                <a href="{% url 'detalle_orden_compra' orden.id %}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.cantidad-recibir').forEach(input => {
+    input.addEventListener('change', function() {
+        const hidden = this.nextElementSibling;
+        const itemId = this.dataset.itemId;
+        hidden.value = JSON.stringify({
+            item_id: parseInt(itemId),
+            cantidad_recibida: parseInt(this.value) || 0
+        });
+    });
+});
+</script>
+{% endblock %}
+

@@ -13,3 +13,14 @@ psycopg2-binary>=2.9.9
 dj-database-url>=2.1.0
 pytz>=2025.2
 
+# Testing
+pytest-django>=4.5.2
+pytest-cov>=4.1.0
+pytest-factoryboy>=2.5.1
+factory-boy>=3.3.0
+
+# API REST
+djangorestframework>=3.14.0
+djangorestframework-simplejwt>=5.2.2
+django-filter>=23.3
+

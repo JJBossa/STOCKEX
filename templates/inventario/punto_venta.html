@@ -217,6 +217,25 @@
             </div>
             
             <div class="mb-2">
+                <label class="form-label mb-1" style="font-size: 0.95rem;">Cliente (Opcional)</label>
+                <select class="form-select" id="cliente-select" style="font-size: 0.95rem; padding: 6px;">
+                    <option value="">Venta General</option>
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="es-credito" onchange="toggleCredito()">
+                    <label class="form-check-label" for="es-credito" style="font-size: 0.95rem;">
+                        Venta a Crédito
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mb-2" id="metodo-pago-section">
                 <label class="form-label mb-1" style="font-size: 0.95rem;">Método de Pago</label>
                 <select class="form-select" id="metodo-pago" style="font-size: 0.95rem; padding: 6px;">
                     <option value="efectivo">Efectivo</option>
@@ -573,10 +592,35 @@ function calcularCambio() {
     }
 }
 
+// Toggle crédito
+function toggleCredito() {
+    const esCredito = document.getElementById('es-credito').checked;
+    const metodoPagoSection = document.getElementById('metodo-pago-section');
+    const efectivoSection = document.getElementById('efectivo-section');
+    const clienteSelect = document.getElementById('cliente-select');
+    
+    if (esCredito) {
+        metodoPagoSection.style.display = 'none';
+        efectivoSection.style.display = 'none';
+        if (!clienteSelect.value) {
+            alert('Debes seleccionar un cliente para ventas a crédito');
+            document.getElementById('es-credito').checked = false;
+            return;
+        }
+    } else {
+        metodoPagoSection.style.display = 'block';
+        const metodoPago = document.getElementById('metodo-pago').value;
+        if (metodoPago === 'efectivo' || metodoPago === 'mixto') {
+            efectivoSection.style.display = 'block';
+        }
+    }
+}
+
 // Mostrar/ocultar sección de efectivo
 document.getElementById('metodo-pago').addEventListener('change', function() {
     const efectivoSection = document.getElementById('efectivo-section');
-    if (this.value === 'efectivo' || this.value === 'mixto') {
+    const esCredito = document.getElementById('es-credito').checked;
+    if (!esCredito && (this.value === 'efectivo' || this.value === 'mixto')) {
         efectivoSection.style.display = 'block';
     } else {
         efectivoSection.style.display = 'none';

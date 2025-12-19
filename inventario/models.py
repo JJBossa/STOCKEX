@@ -3,6 +3,7 @@ from django.core.validators import MinValueValidator
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.db.models import Sum
 from PIL import Image
 import os
 import uuid
@@ -349,10 +350,12 @@ class Venta(models.Model):
         ('efectivo', 'Efectivo'),
         ('tarjeta', 'Tarjeta'),
         ('transferencia', 'Transferencia'),
+        ('credito', 'Crédito'),
         ('mixto', 'Mixto'),
     ]
     
     numero_venta = models.CharField(max_length=50, unique=True, verbose_name="Número de Venta")
+    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, related_name='ventas', verbose_name="Cliente")
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Vendedor")
     fecha = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Venta")
     subtotal = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Subtotal")
@@ -361,6 +364,7 @@ class Venta(models.Model):
     metodo_pago = models.CharField(max_length=20, choices=METODO_PAGO_CHOICES, default='efectivo', verbose_name="Método de Pago")
     monto_recibido = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Monto Recibido")
     cambio = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Cambio")
+    es_credito = models.BooleanField(default=False, verbose_name="Venta a Crédito", help_text="Si es crédito, se creará una cuenta por cobrar")
     notas = models.TextField(blank=True, null=True, verbose_name="Notas")
     cancelada = models.BooleanField(default=False, verbose_name="Venta Cancelada")
 
@@ -414,8 +418,10 @@ class Cotizacion(models.Model):
     ]
     
     numero_cotizacion = models.CharField(max_length=50, unique=True, verbose_name="Número de Cotización")
+    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, related_name='cotizaciones', verbose_name="Cliente")
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Vendedor")
-    cliente_nombre = models.CharField(max_length=200, verbose_name="Nombre del Cliente")
+    # Mantener campos legacy para compatibilidad
+    cliente_nombre = models.CharField(max_length=200, blank=True, null=True, verbose_name="Nombre del Cliente (Legacy)")
     cliente_contacto = models.CharField(max_length=200, blank=True, null=True, verbose_name="Contacto")
     cliente_telefono = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono")
     cliente_email = models.EmailField(blank=True, null=True, verbose_name="Email")
@@ -489,3 +495,357 @@ class NotificacionStock(models.Model):
     
     def __str__(self):
         return f"Stock bajo: {self.producto.nombre} - {self.stock_actual} unidades"
+
+
+class Cliente(models.Model):
+    """Modelo para gestionar clientes"""
+    TIPO_CLIENTE_CHOICES = [
+        ('natural', 'Persona Natural'),
+        ('empresa', 'Empresa'),
+    ]
+    
+    nombre = models.CharField(max_length=200, verbose_name="Nombre o Razón Social")
+    rut = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="RUT", help_text="RUT del cliente (opcional)")
+    tipo_cliente = models.CharField(max_length=20, choices=TIPO_CLIENTE_CHOICES, default='natural', verbose_name="Tipo de Cliente")
+    email = models.EmailField(blank=True, null=True, verbose_name="Email")
+    telefono = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono")
+    direccion = models.TextField(blank=True, null=True, verbose_name="Dirección")
+    contacto = models.CharField(max_length=200, blank=True, null=True, verbose_name="Persona de Contacto")
+    limite_credito = models.DecimalField(
+        max_digits=12, 
+        decimal_places=0, 
+        default=0, 
+        verbose_name="Límite de Crédito",
+        help_text="Monto máximo de crédito permitido (0 = sin límite)"
+    )
+    activo = models.BooleanField(default=True, verbose_name="Activo", help_text="Cliente activo en el sistema")
+    fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Cliente"
+        verbose_name_plural = "Clientes"
+        ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['nombre']),
+            models.Index(fields=['rut']),
+            models.Index(fields=['activo']),
+        ]
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.rut or 'Sin RUT'})"
+    
+    @property
+    def total_compras(self):
+        """Calcula el total de compras del cliente"""
+        from django.db.models import Sum
+        total = Venta.objects.filter(
+            cliente=self,
+            cancelada=False
+        ).aggregate(Sum('total'))['total__sum'] or 0
+        return total
+    
+    @property
+    def cantidad_ventas(self):
+        """Cuenta la cantidad de ventas del cliente"""
+        return Venta.objects.filter(cliente=self, cancelada=False).count()
+    
+    @property
+    def saldo_pendiente(self):
+        """Calcula el saldo pendiente de cuentas por cobrar"""
+        from django.db.models import Sum
+        total = CuentaPorCobrar.objects.filter(
+            cliente=self,
+            estado__in=['pendiente', 'parcial']
+        ).aggregate(
+            saldo=Sum('monto_total') - Sum('monto_pagado')
+        )['saldo'] or 0
+        return max(0, total)
+
+
+class CuentaPorCobrar(models.Model):
+    """Modelo para gestionar cuentas por cobrar (créditos a clientes)"""
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('parcial', 'Pago Parcial'),
+        ('pagado', 'Pagado'),
+        ('vencido', 'Vencido'),
+        ('cancelado', 'Cancelado'),
+    ]
+    
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='cuentas_por_cobrar', verbose_name="Cliente")
+    venta = models.ForeignKey(Venta, on_delete=models.SET_NULL, null=True, blank=True, related_name='cuenta_por_cobrar', verbose_name="Venta Relacionada")
+    numero_documento = models.CharField(max_length=50, unique=True, verbose_name="Número de Documento")
+    monto_total = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="Monto Total")
+    monto_pagado = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Monto Pagado")
+    fecha_emision = models.DateField(verbose_name="Fecha de Emisión")
+    fecha_vencimiento = models.DateField(verbose_name="Fecha de Vencimiento")
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', verbose_name="Estado")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    
+    class Meta:
+        verbose_name = "Cuenta por Cobrar"
+        verbose_name_plural = "Cuentas por Cobrar"
+        ordering = ['-fecha_emision']
+        indexes = [
+            models.Index(fields=['cliente', 'estado']),
+            models.Index(fields=['fecha_vencimiento']),
+            models.Index(fields=['estado', 'fecha_vencimiento']),
+        ]
+    
+    def __str__(self):
+        return f"{self.numero_documento} - {self.cliente.nombre} - ${self.monto_total:,.0f}"
+    
+    @property
+    def saldo_pendiente(self):
+        """Calcula el saldo pendiente"""
+        return max(0, self.monto_total - self.monto_pagado)
+    
+    @property
+    def esta_vencida(self):
+        """Verifica si la cuenta está vencida"""
+        from django.utils import timezone
+        return timezone.now().date() > self.fecha_vencimiento and self.estado in ['pendiente', 'parcial']
+    
+    def save(self, *args, **kwargs):
+        """Actualiza el estado según el monto pagado"""
+        if not self.numero_documento:
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            self.numero_documento = f"CC-{timestamp}"
+        
+        # Actualizar estado según pagos
+        if self.monto_pagado >= self.monto_total:
+            self.estado = 'pagado'
+        elif self.monto_pagado > 0:
+            self.estado = 'parcial'
+        elif self.estado == 'pagado' and self.monto_pagado < self.monto_total:
+            self.estado = 'pendiente'
+        
+        super().save(*args, **kwargs)
+
+
+class PagoCliente(models.Model):
+    """Modelo para registrar pagos de clientes"""
+    METODO_PAGO_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia'),
+        ('cheque', 'Cheque'),
+        ('tarjeta', 'Tarjeta'),
+        ('otro', 'Otro'),
+    ]
+    
+    cuenta_por_cobrar = models.ForeignKey(CuentaPorCobrar, on_delete=models.CASCADE, related_name='pagos', verbose_name="Cuenta por Cobrar")
+    monto = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="Monto")
+    fecha_pago = models.DateField(verbose_name="Fecha de Pago")
+    metodo_pago = models.CharField(max_length=20, choices=METODO_PAGO_CHOICES, default='efectivo', verbose_name="Método de Pago")
+    referencia = models.CharField(max_length=200, blank=True, null=True, verbose_name="Referencia", help_text="Número de cheque, transferencia, etc.")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Registrado por")
+    fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
+    
+    class Meta:
+        verbose_name = "Pago de Cliente"
+        verbose_name_plural = "Pagos de Clientes"
+        ordering = ['-fecha_pago']
+        indexes = [
+            models.Index(fields=['cuenta_por_cobrar', 'fecha_pago']),
+        ]
+    
+    def __str__(self):
+        return f"Pago ${self.monto:,.0f} - {self.cuenta_por_cobrar.cliente.nombre} - {self.fecha_pago}"
+    
+    def save(self, *args, **kwargs):
+        """Actualiza el monto pagado de la cuenta por cobrar"""
+        super().save(*args, **kwargs)
+        # Actualizar monto pagado de la cuenta
+        cuenta = self.cuenta_por_cobrar
+        from django.db.models import Sum
+        cuenta.monto_pagado = cuenta.pagos.aggregate(
+            total=Sum('monto')
+        )['total'] or 0
+        cuenta.save()
+
+
+class Almacen(models.Model):
+    """Modelo para gestionar múltiples almacenes/sucursales"""
+    nombre = models.CharField(max_length=200, verbose_name="Nombre del Almacén")
+    codigo = models.CharField(max_length=20, unique=True, verbose_name="Código", help_text="Código único del almacén")
+    direccion = models.TextField(blank=True, null=True, verbose_name="Dirección")
+    telefono = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono")
+    responsable = models.CharField(max_length=200, blank=True, null=True, verbose_name="Responsable")
+    activo = models.BooleanField(default=True, verbose_name="Activo")
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Almacén"
+        verbose_name_plural = "Almacenes"
+        ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['codigo']),
+            models.Index(fields=['activo']),
+        ]
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.codigo})"
+
+
+class StockAlmacen(models.Model):
+    """Modelo para gestionar stock por almacén"""
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='stock_almacenes', verbose_name="Producto")
+    almacen = models.ForeignKey(Almacen, on_delete=models.CASCADE, related_name='stock_productos', verbose_name="Almacén")
+    cantidad = models.IntegerField(default=0, validators=[MinValueValidator(0)], verbose_name="Cantidad")
+    stock_minimo = models.IntegerField(default=10, validators=[MinValueValidator(0)], verbose_name="Stock Mínimo")
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
+    
+    class Meta:
+        verbose_name = "Stock por Almacén"
+        verbose_name_plural = "Stocks por Almacén"
+        unique_together = ['producto', 'almacen']
+        indexes = [
+            models.Index(fields=['almacen', 'producto']),
+            models.Index(fields=['cantidad']),
+        ]
+    
+    def __str__(self):
+        return f"{self.producto.nombre} - {self.almacen.nombre}: {self.cantidad}"
+    
+    @property
+    def stock_bajo(self):
+        """Indica si el stock está por debajo del mínimo"""
+        return self.cantidad <= self.stock_minimo
+
+
+class Transferencia(models.Model):
+    """Modelo para transferencias entre almacenes"""
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('en_transito', 'En Tránsito'),
+        ('completada', 'Completada'),
+        ('cancelada', 'Cancelada'),
+    ]
+    
+    numero_transferencia = models.CharField(max_length=50, unique=True, verbose_name="Número de Transferencia")
+    almacen_origen = models.ForeignKey(Almacen, on_delete=models.CASCADE, related_name='transferencias_salida', verbose_name="Almacén Origen")
+    almacen_destino = models.ForeignKey(Almacen, on_delete=models.CASCADE, related_name='transferencias_entrada', verbose_name="Almacén Destino")
+    fecha_solicitud = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Solicitud")
+    fecha_transferencia = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de Transferencia")
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', verbose_name="Estado")
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Usuario")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Transferencia"
+        verbose_name_plural = "Transferencias"
+        ordering = ['-fecha_solicitud']
+        indexes = [
+            models.Index(fields=['almacen_origen', 'estado']),
+            models.Index(fields=['almacen_destino', 'estado']),
+        ]
+    
+    def __str__(self):
+        return f"Transferencia #{self.numero_transferencia} - {self.almacen_origen} → {self.almacen_destino}"
+    
+    def save(self, *args, **kwargs):
+        if not self.numero_transferencia:
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            self.numero_transferencia = f"TRF-{timestamp}"
+        super().save(*args, **kwargs)
+
+
+class ItemTransferencia(models.Model):
+    """Items de una transferencia"""
+    transferencia = models.ForeignKey(Transferencia, on_delete=models.CASCADE, related_name='items', verbose_name="Transferencia")
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, verbose_name="Producto")
+    cantidad = models.IntegerField(validators=[MinValueValidator(1)], verbose_name="Cantidad")
+    cantidad_enviada = models.IntegerField(default=0, verbose_name="Cantidad Enviada")
+    cantidad_recibida = models.IntegerField(default=0, verbose_name="Cantidad Recibida")
+    
+    class Meta:
+        verbose_name = "Item de Transferencia"
+        verbose_name_plural = "Items de Transferencia"
+    
+    def __str__(self):
+        return f"{self.producto.nombre} - {self.cantidad} unidades"
+
+
+class OrdenCompra(models.Model):
+    """Modelo para órdenes de compra a proveedores"""
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('parcial', 'Parcialmente Recibida'),
+        ('completada', 'Completada'),
+        ('cancelada', 'Cancelada'),
+    ]
+    
+    numero_orden = models.CharField(max_length=50, unique=True, verbose_name="Número de Orden")
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE, related_name='ordenes_compra', verbose_name="Proveedor")
+    fecha_orden = models.DateField(verbose_name="Fecha de Orden")
+    fecha_esperada = models.DateField(verbose_name="Fecha Esperada de Recepción")
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', verbose_name="Estado")
+    subtotal = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Subtotal")
+    descuento = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Descuento")
+    total = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Total")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Creado por")
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    
+    class Meta:
+        verbose_name = "Orden de Compra"
+        verbose_name_plural = "Órdenes de Compra"
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['proveedor', 'estado']),
+            models.Index(fields=['fecha_orden']),
+        ]
+    
+    def __str__(self):
+        return f"OC #{self.numero_orden} - {self.proveedor.nombre} - ${self.total:,.0f}"
+    
+    def save(self, *args, **kwargs):
+        if not self.numero_orden:
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            self.numero_orden = f"OC-{timestamp}"
+        super().save(*args, **kwargs)
+
+
+class ItemOrdenCompra(models.Model):
+    """Items de una orden de compra"""
+    orden = models.ForeignKey(OrdenCompra, on_delete=models.CASCADE, related_name='items', verbose_name="Orden de Compra")
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, verbose_name="Producto")
+    cantidad = models.IntegerField(validators=[MinValueValidator(1)], verbose_name="Cantidad Solicitada")
+    cantidad_recibida = models.IntegerField(default=0, verbose_name="Cantidad Recibida")
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=0, verbose_name="Precio Unitario")
+    subtotal = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Subtotal")
+    
+    class Meta:
+        verbose_name = "Item de Orden de Compra"
+        verbose_name_plural = "Items de Orden de Compra"
+    
+    def __str__(self):
+        return f"{self.producto.nombre} - {self.cantidad} x ${self.precio_unitario}"
+    
+    def save(self, *args, **kwargs):
+        self.subtotal = self.cantidad * self.precio_unitario
+        super().save(*args, **kwargs)
+
+
+class RecepcionMercancia(models.Model):
+    """Modelo para recepción de mercancía de órdenes de compra"""
+    orden_compra = models.ForeignKey(OrdenCompra, on_delete=models.CASCADE, related_name='recepciones', verbose_name="Orden de Compra")
+    almacen = models.ForeignKey(Almacen, on_delete=models.CASCADE, verbose_name="Almacén de Recepción")
+    fecha_recepcion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Recepción")
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Recibido por")
+    notas = models.TextField(blank=True, null=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Recepción de Mercancía"
+        verbose_name_plural = "Recepciones de Mercancía"
+        ordering = ['-fecha_recepcion']
+    
+    def __str__(self):
+        return f"Recepción OC #{self.orden_compra.numero_orden} - {self.fecha_recepcion.strftime('%d/%m/%Y')}"

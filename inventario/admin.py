@@ -1,6 +1,12 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Producto, Categoria, HistorialCambio, Factura, ItemFactura, Proveedor, ProductoFavorito, MovimientoStock, Venta, ItemVenta, Cotizacion, ItemCotizacion, NotificacionStock
+from .models import (
+    Producto, Categoria, HistorialCambio, Factura, ItemFactura, Proveedor, 
+    ProductoFavorito, MovimientoStock, Venta, ItemVenta, Cotizacion, 
+    ItemCotizacion, NotificacionStock, Cliente, CuentaPorCobrar, PagoCliente,
+    Almacen, StockAlmacen, Transferencia, ItemTransferencia, OrdenCompra,
+    ItemOrdenCompra, RecepcionMercancia
+)
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
@@ -194,3 +200,143 @@ class NotificacionStockAdmin(admin.ModelAdmin):
     mark_as_viewed.short_description = "Marcar como vistas"
     
     actions = [mark_as_viewed]
+
+
+@admin.register(Cliente)
+class ClienteAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'rut', 'tipo_cliente', 'email', 'telefono', 'limite_credito', 'total_compras_display', 'saldo_pendiente_display', 'activo', 'fecha_registro')
+    list_filter = ('tipo_cliente', 'activo', 'fecha_registro')
+    search_fields = ('nombre', 'rut', 'email', 'telefono')
+    readonly_fields = ('fecha_registro', 'total_compras', 'cantidad_ventas', 'saldo_pendiente')
+    fieldsets = (
+        ('Información del Cliente', {
+            'fields': ('nombre', 'rut', 'tipo_cliente', 'activo')
+        }),
+        ('Contacto', {
+            'fields': ('email', 'telefono', 'direccion', 'contacto')
+        }),
+        ('Crédito', {
+            'fields': ('limite_credito',)
+        }),
+        ('Estadísticas', {
+            'fields': ('total_compras', 'cantidad_ventas', 'saldo_pendiente'),
+            'classes': ('collapse',)
+        }),
+        ('Notas', {
+            'fields': ('notas',)
+        }),
+    )
+    
+    def total_compras_display(self, obj):
+        return f"${obj.total_compras:,.0f}"
+    total_compras_display.short_description = "Total Compras"
+    
+    def saldo_pendiente_display(self, obj):
+        saldo = obj.saldo_pendiente
+        if saldo > 0:
+            return format_html('<span style="color: red;">${:,.0f}</span>', saldo)
+        return f"${saldo:,.0f}"
+    saldo_pendiente_display.short_description = "Saldo Pendiente"
+
+
+class PagoClienteInline(admin.TabularInline):
+    model = PagoCliente
+    extra = 0
+    readonly_fields = ('fecha_registro',)
+    fields = ('monto', 'fecha_pago', 'metodo_pago', 'referencia', 'notas', 'usuario', 'fecha_registro')
+
+
+@admin.register(CuentaPorCobrar)
+class CuentaPorCobrarAdmin(admin.ModelAdmin):
+    list_display = ('numero_documento', 'cliente', 'monto_total', 'monto_pagado', 'saldo_pendiente_display', 'fecha_vencimiento', 'estado', 'esta_vencida_display')
+    list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
+    search_fields = ('numero_documento', 'cliente__nombre', 'cliente__rut')
+    readonly_fields = ('numero_documento', 'fecha_creacion', 'saldo_pendiente', 'esta_vencida')
+    inlines = [PagoClienteInline]
+    date_hierarchy = 'fecha_emision'
+    
+    def saldo_pendiente_display(self, obj):
+        saldo = obj.saldo_pendiente
+        if saldo > 0:
+            return format_html('<span style="color: red;">${:,.0f}</span>', saldo)
+        return f"${saldo:,.0f}"
+    saldo_pendiente_display.short_description = "Saldo Pendiente"
+    
+    def esta_vencida_display(self, obj):
+        if obj.esta_vencida:
+            return format_html('<span style="color: red;">⚠️ Vencida</span>')
+        return "✓"
+    esta_vencida_display.short_description = "Estado"
+
+
+@admin.register(PagoCliente)
+class PagoClienteAdmin(admin.ModelAdmin):
+    list_display = ('cuenta_por_cobrar', 'monto', 'fecha_pago', 'metodo_pago', 'usuario', 'fecha_registro')
+    list_filter = ('metodo_pago', 'fecha_pago', 'fecha_registro')
+    search_fields = ('cuenta_por_cobrar__numero_documento', 'cuenta_por_cobrar__cliente__nombre')
+    readonly_fields = ('fecha_registro',)
+    date_hierarchy = 'fecha_pago'
+
+
+@admin.register(Almacen)
+class AlmacenAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'codigo', 'responsable', 'activo', 'fecha_creacion')
+    list_filter = ('activo', 'fecha_creacion')
+    search_fields = ('nombre', 'codigo', 'responsable')
+    readonly_fields = ('fecha_creacion',)
+
+
+@admin.register(StockAlmacen)
+class StockAlmacenAdmin(admin.ModelAdmin):
+    list_display = ('producto', 'almacen', 'cantidad', 'stock_minimo', 'stock_bajo_indicator', 'fecha_actualizacion')
+    list_filter = ('almacen', 'fecha_actualizacion')
+    search_fields = ('producto__nombre', 'almacen__nombre')
+    readonly_fields = ('fecha_actualizacion', 'stock_bajo')
+    
+    def stock_bajo_indicator(self, obj):
+        if obj.stock_bajo:
+            return format_html('<span style="color: red;">⚠ Stock Bajo</span>')
+        return "✓"
+    stock_bajo_indicator.short_description = "Estado"
+
+
+class ItemTransferenciaInline(admin.TabularInline):
+    model = ItemTransferencia
+    extra = 0
+    fields = ('producto', 'cantidad', 'cantidad_enviada', 'cantidad_recibida')
+
+
+@admin.register(Transferencia)
+class TransferenciaAdmin(admin.ModelAdmin):
+    list_display = ('numero_transferencia', 'almacen_origen', 'almacen_destino', 'fecha_solicitud', 'fecha_transferencia', 'estado', 'usuario')
+    list_filter = ('estado', 'fecha_solicitud', 'almacen_origen', 'almacen_destino')
+    search_fields = ('numero_transferencia', 'almacen_origen__nombre', 'almacen_destino__nombre')
+    readonly_fields = ('numero_transferencia', 'fecha_solicitud')
+    inlines = [ItemTransferenciaInline]
+    date_hierarchy = 'fecha_solicitud'
+
+
+class ItemOrdenCompraInline(admin.TabularInline):
+    model = ItemOrdenCompra
+    extra = 0
+    readonly_fields = ('subtotal',)
+    fields = ('producto', 'cantidad', 'cantidad_recibida', 'precio_unitario', 'subtotal')
+
+
+@admin.register(OrdenCompra)
+class OrdenCompraAdmin(admin.ModelAdmin):
+    list_display = ('numero_orden', 'proveedor', 'fecha_orden', 'fecha_esperada', 'total', 'estado', 'usuario', 'fecha_creacion')
+    list_filter = ('estado', 'fecha_orden', 'fecha_creacion')
+    search_fields = ('numero_orden', 'proveedor__nombre')
+    readonly_fields = ('numero_orden', 'fecha_creacion', 'subtotal', 'total')
+    inlines = [ItemOrdenCompraInline]
+    date_hierarchy = 'fecha_creacion'
+
+
+@admin.register(RecepcionMercancia)
+class RecepcionMercanciaAdmin(admin.ModelAdmin):
+    list_display = ('orden_compra', 'almacen', 'fecha_recepcion', 'usuario')
+    list_filter = ('almacen', 'fecha_recepcion')
+    search_fields = ('orden_compra__numero_orden', 'almacen__nombre')
+    readonly_fields = ('fecha_recepcion',)
+    date_hierarchy = 'fecha_recepcion'

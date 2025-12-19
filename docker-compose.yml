@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: stockex_web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./logs:/app/logs
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key-change-in-production}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 control_stock.wsgi:application"
+    restart: unless-stopped
+
+  # Opcional: Base de datos PostgreSQL para producción
+  # db:
+  #   image: postgres:15
+  #   container_name: stockex_db
+  #   environment:
+  #     - POSTGRES_DB=stockex
+  #     - POSTGRES_USER=stockex
+  #     - POSTGRES_PASSWORD=stockex_password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+# volumes:
+#   postgres_data:
+

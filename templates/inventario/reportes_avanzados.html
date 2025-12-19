@@ -2,6 +2,39 @@
 
 {% block title %}Reportes Avanzados - STOCKEX{% endblock %}
 
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .stats-card.success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    .stats-card.warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .stats-card.info {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .stats-card.danger {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -10,10 +43,10 @@
     </ol>
 </nav>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-graph-up text-primary"></i> Reportes Avanzados</h2>
-    <div>
-        <form method="get" class="d-inline me-2">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2><i class="bi bi-graph-up text-primary"></i> Reportes y Análisis Avanzados</h2>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-inline">
             <select name="dias" class="form-select d-inline-block" style="width: auto;" onchange="this.form.submit()">
                 <option value="7" {% if dias == 7 %}selected{% endif %}>Últimos 7 días</option>
                 <option value="30" {% if dias == 30 %}selected{% endif %}>Últimos 30 días</option>
@@ -27,71 +60,122 @@
     </div>
 </div>
 
-<!-- Estadísticas Generales -->
+<!-- Estadísticas Principales -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <h5>Total Productos</h5>
-                <h3>{{ total_productos }}</h3>
-            </div>
+        <div class="stats-card success">
+            <h5><i class="bi bi-currency-dollar"></i> Total Ventas</h5>
+            <h2>${{ total_ventas_periodo|floatformat:0 }}</h2>
+            <small>{{ cantidad_ventas }} venta{{ cantidad_ventas|pluralize }}</small>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5>Ventas del Período</h5>
-                <h3>${{ total_ventas_periodo|floatformat:0 }}</h3>
-                <small>{{ cantidad_ventas }} venta{{ cantidad_ventas|pluralize }}</small>
-            </div>
+        <div class="stats-card info">
+            <h5><i class="bi bi-calculator"></i> Promedio por Venta</h5>
+            <h2>${{ promedio_venta|floatformat:0 }}</h2>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <h5>Valor Inventario</h5>
-                <h3>${{ valor_inventario_total|floatformat:0 }}</h3>
-            </div>
+        <div class="stats-card">
+            <h5><i class="bi bi-boxes"></i> Valor Inventario</h5>
+            <h2>${{ valor_inventario_total|floatformat:0 }}</h2>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <h5>Ganancia Potencial</h5>
-                <h3>${{ ganancia_potencial_total|floatformat:0 }}</h3>
-            </div>
+        <div class="stats-card warning">
+            <h5><i class="bi bi-cash-coin"></i> Ganancia Potencial</h5>
+            <h2>${{ ganancia_potencial_total|floatformat:0 }}</h2>
         </div>
     </div>
 </div>
 
-<!-- Ventas por Método de Pago -->
-{% if ventas_por_metodo %}
+<!-- Gráficos de Ventas -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="chart-container">
+            <h5 class="mb-3"><i class="bi bi-bar-chart-line"></i> Ventas en el Tiempo</h5>
+            <canvas id="ventasChart" height="80"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5 class="mb-3"><i class="bi bi-credit-card"></i> Ventas por Método de Pago</h5>
+            <canvas id="metodoPagoChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="chart-container">
+            <h5 class="mb-3"><i class="bi bi-wallet2"></i> Crédito vs Contado</h5>
+            <canvas id="creditoContadoChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Análisis de Cuentas por Cobrar -->
+{% if total_pendiente > 0 %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-credit-card"></i> Cuentas por Cobrar</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Total Pendiente:</strong> ${{ total_pendiente|floatformat:0 }}</p>
+                {% if total_vencido > 0 %}
+                <p class="text-danger"><strong>Total Vencido:</strong> ${{ total_vencido|floatformat:0 }}</p>
+                <p class="text-danger"><strong>Cuentas Vencidas:</strong> {{ cuentas_vencidas_count }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-building"></i> Almacenes</h5>
+            </div>
+            <div class="card-body">
+                {% for info in almacenes_info %}
+                <p><strong>{{ info.almacen.nombre }}:</strong> {{ info.productos_count }} productos
+                    {% if info.stock_bajo_count > 0 %}
+                    <span class="badge bg-warning">{{ info.stock_bajo_count }} stock bajo</span>
+                    {% endif %}
+                </p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Top Clientes -->
+{% if top_clientes %}
 <div class="card mb-4">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0"><i class="bi bi-credit-card"></i> Ventas por Método de Pago</h5>
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-people"></i> Top 10 Clientes</h5>
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>Método</th>
-                        <th>Cantidad de Ventas</th>
-                        <th>Total</th>
+                        <th>#</th>
+                        <th>Cliente</th>
+                        <th>Total Compras</th>
+                        <th>Cantidad Ventas</th>
+                        <th>Promedio</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in ventas_por_metodo %}
+                    {% for cliente in top_clientes %}
                     <tr>
-                        <td><strong>
-                            {% if item.metodo_pago == 'efectivo' %}Efectivo
-                            {% elif item.metodo_pago == 'tarjeta' %}Tarjeta
-                            {% elif item.metodo_pago == 'transferencia' %}Transferencia
-                            {% elif item.metodo_pago == 'mixto' %}Mixto
-                            {% else %}{{ item.metodo_pago }}{% endif %}
-                        </strong></td>
-                        <td>{{ item.cantidad }}</td>
-                        <td><strong>${{ item.total|floatformat:0 }}</strong></td>
+                        <td><strong>{{ forloop.counter }}</strong></td>
+                        <td>{{ cliente.cliente__nombre }}</td>
+                        <td><strong>${{ cliente.total_compras|floatformat:0 }}</strong></td>
+                        <td>{{ cliente.cantidad_ventas }}</td>
+                        <td>${{ cliente.promedio|floatformat:0 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -103,18 +187,19 @@
 
 <!-- Productos Más Vendidos -->
 <div class="card mb-4">
-    <div class="card-header bg-primary text-white">
-        <h5 class="mb-0"><i class="bi bi-trophy"></i> Productos Más Vendidos</h5>
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 Productos Más Vendidos</h5>
     </div>
     <div class="card-body">
         {% if productos_mas_vendidos %}
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-hover">
                 <thead>
                     <tr>
                         <th>#</th>
                         <th>Producto</th>
-                        <th>Total Vendido</th>
+                        <th>Cantidad Vendida</th>
+                        <th>Ingresos Totales</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -123,6 +208,7 @@
                         <td><strong>{{ forloop.counter }}</strong></td>
                         <td>{{ item.producto__nombre }}</td>
                         <td><span class="badge bg-success">{{ item.total_vendido }} unidades</span></td>
+                        <td><strong>${{ item.total_ingresos|floatformat:0 }}</strong></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -134,15 +220,64 @@
     </div>
 </div>
 
+<!-- Productos por Categoría -->
+{% if productos_por_categoria %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-tags"></i> Productos por Categoría</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoriasChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Top Productos Rentables</h5>
+            </div>
+            <div class="card-body">
+                {% if productos_rentables %}
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Margen %</th>
+                                <th>Ganancia Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in productos_rentables|slice:":5" %}
+                            <tr>
+                                <td>{{ item.producto.nombre|truncatewords:3 }}</td>
+                                <td><span class="badge bg-success">{{ item.margen|floatformat:1 }}%</span></td>
+                                <td><strong>${{ item.ganancia_total|floatformat:0 }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay productos con precio de compra registrado</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Rotación de Inventario -->
+{% if productos_rotacion %}
 <div class="card mb-4">
     <div class="card-header bg-info text-white">
         <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Rotación de Inventario</h5>
     </div>
     <div class="card-body">
-        {% if productos_rotacion %}
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-hover">
                 <thead>
                     <tr>
                         <th>Producto</th>
@@ -163,60 +298,19 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <p class="text-muted">No hay datos de rotación en este período</p>
-        {% endif %}
     </div>
 </div>
-
-<!-- Productos Más Rentables -->
-<div class="card mb-4">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Productos Más Rentables</h5>
-    </div>
-    <div class="card-body">
-        {% if productos_rentables %}
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Precio Compra</th>
-                        <th>Precio Venta</th>
-                        <th>Margen %</th>
-                        <th>Stock</th>
-                        <th>Ganancia Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in productos_rentables %}
-                    <tr>
-                        <td>{{ item.producto.nombre }}</td>
-                        <td>${{ item.producto.precio_compra|floatformat:0 }}</td>
-                        <td>${{ item.producto.precio|floatformat:0 }}</td>
-                        <td><span class="badge bg-success">{{ item.producto.margen_ganancia|floatformat:1 }}%</span></td>
-                        <td>{{ item.producto.stock }}</td>
-                        <td><strong>${{ item.ganancia_total|floatformat:0 }}</strong></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p class="text-muted">No hay productos con precio de compra registrado</p>
-        {% endif %}
-    </div>
-</div>
+{% endif %}
 
 <!-- Productos Sin Movimiento -->
+{% if productos_sin_movimiento %}
 <div class="card">
-    <div class="card-header bg-warning text-white">
+    <div class="card-header bg-warning text-dark">
         <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Productos Sin Movimiento</h5>
     </div>
     <div class="card-body">
-        {% if productos_sin_movimiento %}
         <div class="table-responsive">
-            <table class="table">
+            <table class="table table-hover">
                 <thead>
                     <tr>
                         <th>Producto</th>
@@ -237,14 +331,179 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
-        <p class="text-muted">Todos los productos han tenido movimiento en este período</p>
-        {% endif %}
     </div>
 </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#666';
+    
+    const fechas = JSON.parse('{{ fechas_ordenadas|escapejs }}');
+    const ventasTotal = JSON.parse('{{ ventas_por_dia_total|escapejs }}');
+    const ventasCantidad = JSON.parse('{{ ventas_por_dia_cantidad|escapejs }}');
+    
+    // Gráfico de Ventas en el Tiempo
+    const ventasCtx = document.getElementById('ventasChart').getContext('2d');
+    new Chart(ventasCtx, {
+        type: 'line',
+        data: {
+            labels: fechas,
+            datasets: [{
+                label: 'Total Ventas ($)',
+                data: ventasTotal,
+                borderColor: 'rgb(102, 126, 234)',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true, position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Total: $' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gráfico de Métodos de Pago
+    const metodoPagoData = {
+        labels: [
+            {% for metodo in ventas_por_metodo %}
+            '{{ metodo.metodo_pago|capfirst }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for metodo in ventas_por_metodo %}
+                {{ metodo.total }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                'rgba(102, 126, 234, 0.8)',
+                'rgba(245, 87, 108, 0.8)',
+                'rgba(75, 192, 192, 0.8)',
+                'rgba(255, 206, 86, 0.8)',
+            ]
+        }]
+    };
+    
+    const metodoPagoCtx = document.getElementById('metodoPagoChart').getContext('2d');
+    new Chart(metodoPagoCtx, {
+        type: 'doughnut',
+        data: metodoPagoData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return context.label + ': $' + context.parsed.toLocaleString() + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gráfico Crédito vs Contado
+    const creditoContadoData = {
+        labels: ['Contado', 'Crédito'],
+        datasets: [{
+            data: [
+                {{ ventas_contado.total|default:0 }},
+                {{ ventas_credito.total|default:0 }}
+            ],
+            backgroundColor: ['rgba(75, 192, 192, 0.8)', 'rgba(255, 99, 132, 0.8)']
+        }]
+    };
+    
+    const creditoContadoCtx = document.getElementById('creditoContadoChart').getContext('2d');
+    new Chart(creditoContadoCtx, {
+        type: 'pie',
+        data: creditoContadoData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                            return context.label + ': $' + context.parsed.toLocaleString() + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gráfico de Categorías
+    {% if productos_por_categoria %}
+    const categoriasData = {
+        labels: [
+            {% for cat in productos_por_categoria %}
+            '{{ cat.nombre }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Cantidad de Productos',
+            data: [
+                {% for cat in productos_por_categoria %}
+                {{ cat.cantidad }},
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(75, 192, 192, 0.8)',
+            borderColor: 'rgb(75, 192, 192)',
+            borderWidth: 2
+        }]
+    };
+    
+    const categoriasCtx = document.getElementById('categoriasChart').getContext('2d');
+    new Chart(categoriasCtx, {
+        type: 'bar',
+        data: categoriasData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+    {% endif %}
+</script>
 {% endblock %}
 
 {% block ayuda %}
 {% include 'inventario/ayuda_contextual.html' %}
 {% endblock %}
-

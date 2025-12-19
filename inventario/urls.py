@@ -12,6 +12,10 @@ from . import views_impresion
 from . import views_pos
 from . import views_cotizaciones
 from . import views_api
+from . import views_clientes
+from . import views_cuentas_cobrar
+from . import views_almacenes
+from . import views_compras
 
 urlpatterns = [
     path('', views.inicio, name='inicio'),
@@ -81,5 +85,32 @@ urlpatterns = [
     path('cotizaciones/<int:cotizacion_id>/convertir/', views_cotizaciones.convertir_cotizacion_en_venta, name='convertir_cotizacion_en_venta'),
     # API para mejoras UX
     path('api/buscar-productos/', views_api.buscar_productos_api, name='buscar_productos_api'),
+    # Clientes
+    path('clientes/', views_clientes.listar_clientes, name='listar_clientes'),
+    path('clientes/crear/', views_clientes.crear_cliente, name='crear_cliente'),
+    path('clientes/<int:cliente_id>/', views_clientes.detalle_cliente, name='detalle_cliente'),
+    path('clientes/<int:cliente_id>/editar/', views_clientes.editar_cliente, name='editar_cliente'),
+    path('clientes/<int:cliente_id>/eliminar/', views_clientes.eliminar_cliente, name='eliminar_cliente'),
+    path('api/buscar-cliente/', views_clientes.buscar_cliente_api, name='buscar_cliente_api'),
+    # Cuentas por Cobrar
+    path('cuentas-cobrar/', views_cuentas_cobrar.listar_cuentas_cobrar, name='listar_cuentas_cobrar'),
+    path('cuentas-cobrar/crear/', views_cuentas_cobrar.crear_cuenta_cobrar, name='crear_cuenta_cobrar'),
+    path('cuentas-cobrar/crear/<int:cliente_id>/', views_cuentas_cobrar.crear_cuenta_cobrar, name='crear_cuenta_cobrar_cliente'),
+    path('clientes/<int:cliente_id>/cuenta/', views_cuentas_cobrar.crear_cuenta_cobrar, name='crear_cuenta_cobrar_cliente'),
+    path('cuentas-cobrar/<int:cuenta_id>/', views_cuentas_cobrar.detalle_cuenta_cobrar, name='detalle_cuenta_cobrar'),
+    path('cuentas-cobrar/<int:cuenta_id>/pago/', views_cuentas_cobrar.registrar_pago, name='registrar_pago'),
+    # Almacenes
+    path('almacenes/', views_almacenes.listar_almacenes, name='listar_almacenes'),
+    path('almacenes/crear/', views_almacenes.crear_almacen, name='crear_almacen'),
+    path('almacenes/<int:almacen_id>/', views_almacenes.detalle_almacen, name='detalle_almacen'),
+    path('almacenes/<int:almacen_id>/editar/', views_almacenes.editar_almacen, name='editar_almacen'),
+    path('almacenes/transferencia/crear/', views_almacenes.crear_transferencia, name='crear_transferencia'),
+    path('almacenes/transferencia/<int:transferencia_id>/', views_almacenes.detalle_transferencia, name='detalle_transferencia'),
+    path('almacenes/transferencia/<int:transferencia_id>/completar/', views_almacenes.completar_transferencia, name='completar_transferencia'),
+    # Compras
+    path('compras/', views_compras.listar_ordenes_compra, name='listar_ordenes_compra'),
+    path('compras/crear/', views_compras.crear_orden_compra, name='crear_orden_compra'),
+    path('compras/<int:orden_id>/', views_compras.detalle_orden_compra, name='detalle_orden_compra'),
+    path('compras/<int:orden_id>/recibir/', views_compras.recibir_mercancia, name='recibir_mercancia'),
 ]
 
