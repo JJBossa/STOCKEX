@@ -1,0 +1,203 @@
+/* Estilos de Accesibilidad y Mejoras UX */
+
+/* ===== ALTO CONTRASTE ===== */
+.alto-contraste {
+    --bs-body-bg: #000000;
+    --bs-body-color: #ffffff;
+    --bs-primary: #00ff00;
+    --bs-secondary: #ffffff;
+    --bs-success: #00ff00;
+    --bs-danger: #ff0000;
+    --bs-warning: #ffff00;
+    --bs-info: #00ffff;
+}
+
+.alto-contraste .card {
+    background-color: #000000 !important;
+    border: 2px solid #ffffff !important;
+    color: #ffffff !important;
+}
+
+.alto-contraste .btn {
+    border: 2px solid currentColor !important;
+}
+
+.alto-contraste .table {
+    border-color: #ffffff !important;
+}
+
+.alto-contraste .table td,
+.alto-contraste .table th {
+    border-color: #ffffff !important;
+}
+
+/* ===== MEJORAS DE CONTRASTE ===== */
+.btn {
+    min-height: 44px; /* Tamaño mínimo táctil recomendado */
+    min-width: 44px;
+}
+
+/* ===== INDICADORES DE FOCO MEJORADOS ===== */
+*:focus-visible {
+    outline: 3px solid #0d6efd !important;
+    outline-offset: 2px !important;
+    border-radius: 2px;
+}
+
+.btn:focus-visible {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.5) !important;
+}
+
+/* ===== AUTocompletado ===== */
+.autocomplete-container {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #dee2e6;
+    margin-top: 8px !important; /* Más espacio para ver el input */
+}
+
+.autocomplete-item {
+    transition: background-color 0.2s ease;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item:focus {
+    background-color: #f8f9fa !important;
+    outline: 2px solid #0d6efd;
+    outline-offset: -2px;
+}
+
+/* ===== LAZY LOADING ===== */
+img.lazy {
+    opacity: 0;
+    transition: opacity 0.3s;
+    background: #f0f0f0;
+    min-height: 100px;
+}
+
+img.lazy.loaded {
+    opacity: 1;
+}
+
+/* Placeholder mientras carga */
+img[data-src] {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ===== MEJORAS DE NAVEGACIÓN POR TECLADO ===== */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #000;
+    color: #fff;
+    padding: 8px;
+    text-decoration: none;
+    z-index: 100;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* ===== CONTROLES DE ACCESIBILIDAD ===== */
+#accesibilidad-controls {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+#accesibilidad-controls .btn {
+    border-radius: 0.375rem !important;
+    min-width: 40px;
+    padding: 0.375rem 0.5rem;
+}
+
+#accesibilidad-controls .btn-group {
+    gap: 2px;
+}
+
+#accesibilidad-controls .btn:hover {
+    background-color: #f8f9fa;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+}
+
+@media (max-width: 768px) {
+    #accesibilidad-controls {
+        top: 70px !important;
+        right: 10px !important;
+    }
+    
+    #accesibilidad-controls .btn {
+        min-width: 35px;
+        padding: 0.25rem 0.4rem;
+    }
+}
+
+/* ===== MEJORAS DE TAMAÑO DE FUENTE ===== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===== MEJORAS DE CONTRASTE EN MODO OSCURO ===== */
+[data-bs-theme="dark"] .alto-contraste,
+.dark-mode .alto-contraste {
+    --bs-body-bg: #ffffff;
+    --bs-body-color: #000000;
+}
+
+.dark-mode .alto-contraste .card {
+    background-color: #ffffff !important;
+    border: 2px solid #000000 !important;
+    color: #000000 !important;
+}
+
+/* ===== MEJORAS DE READABILIDAD ===== */
+p, li, td, th {
+    line-height: 1.6;
+}
+
+/* ===== MEJORAS PARA LECTORES DE PANTALLA ===== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.sr-only-focusable:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: inherit;
+    margin: inherit;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+}
+

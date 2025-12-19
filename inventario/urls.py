@@ -11,6 +11,7 @@ from . import views_reportes
 from . import views_impresion
 from . import views_pos
 from . import views_cotizaciones
+from . import views_api
 
 urlpatterns = [
     path('', views.inicio, name='inicio'),
@@ -78,5 +79,7 @@ urlpatterns = [
     path('cotizaciones/<int:cotizacion_id>/', views_cotizaciones.detalle_cotizacion, name='detalle_cotizacion'),
     path('cotizaciones/<int:cotizacion_id>/imprimir/', views_cotizaciones.imprimir_cotizacion, name='imprimir_cotizacion'),
     path('cotizaciones/<int:cotizacion_id>/convertir/', views_cotizaciones.convertir_cotizacion_en_venta, name='convertir_cotizacion_en_venta'),
+    # API para mejoras UX
+    path('api/buscar-productos/', views_api.buscar_productos_api, name='buscar_productos_api'),
 ]
 

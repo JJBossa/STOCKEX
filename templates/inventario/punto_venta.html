@@ -183,10 +183,20 @@
                     <span>Descuento:</span>
                     <div class="btn-group btn-group-sm" role="group">
                         <input type="radio" class="btn-check" name="tipo-descuento" id="descuento-fijo" value="fijo" checked onchange="calcularTotal()">
-                        <label class="btn btn-outline-secondary" for="descuento-fijo" style="font-size: 0.8rem; padding: 3px 10px;">$</label>
+                        <label class="btn btn-outline-secondary" 
+                               for="descuento-fijo" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="top" 
+                               title="Descuento en monto fijo (ej: $1000)"
+                               style="font-size: 0.8rem; padding: 3px 10px;">$</label>
                         
                         <input type="radio" class="btn-check" name="tipo-descuento" id="descuento-porcentaje" value="porcentaje" onchange="calcularTotal()">
-                        <label class="btn btn-outline-secondary" for="descuento-porcentaje" style="font-size: 0.8rem; padding: 3px 10px;">%</label>
+                        <label class="btn btn-outline-secondary" 
+                               for="descuento-porcentaje" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="top" 
+                               title="Descuento en porcentaje (ej: 10%)"
+                               style="font-size: 0.8rem; padding: 3px 10px;">%</label>
                     </div>
                 </div>
                 <input type="number" 
@@ -238,10 +248,21 @@
             </div>
             
             <div class="d-grid gap-2" style="position: relative; z-index: 10;">
-                <button class="btn btn-success" onclick="procesarVenta()" style="position: relative; z-index: 10; pointer-events: auto; padding: 10px; font-size: 1rem; font-weight: 600;">
+                <button class="btn btn-success" 
+                        onclick="procesarVenta()" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Finaliza la venta y actualiza el stock automáticamente"
+                        style="position: relative; z-index: 10; pointer-events: auto; padding: 10px; font-size: 1rem; font-weight: 600;">
                     <i class="bi bi-check-circle"></i> Procesar
                 </button>
-                <button type="button" class="btn btn-outline-danger" onclick="limpiarCarrito()" style="position: relative; z-index: 10; pointer-events: auto; cursor: pointer; padding: 8px; font-size: 0.95rem;">
+                <button type="button" 
+                        class="btn btn-outline-danger" 
+                        onclick="limpiarCarrito()" 
+                        data-bs-toggle="tooltip" 
+                        data-bs-placement="top" 
+                        title="Elimina todos los productos del carrito para iniciar una nueva venta"
+                        style="position: relative; z-index: 10; pointer-events: auto; cursor: pointer; padding: 8px; font-size: 0.95rem;">
                     <i class="bi bi-x-circle"></i> Limpiar
                 </button>
             </div>
@@ -267,10 +288,22 @@
             </div>
             <div class="modal-footer d-grid gap-2">
                 <div class="btn-group w-100" role="group">
-                    <button type="button" class="btn btn-primary btn-lg" onclick="imprimirTicket('termica')" id="btn-imprimir-ticket">
+                    <button type="button" 
+                            class="btn btn-primary btn-lg" 
+                            onclick="imprimirTicket('termica')" 
+                            id="btn-imprimir-ticket"
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Imprimir en impresora térmica 58mm">
                         <i class="bi bi-printer"></i> Térmica
                     </button>
-                    <button type="button" class="btn btn-outline-primary btn-lg" onclick="imprimirTicket('a4')" id="btn-imprimir-ticket-a4">
+                    <button type="button" 
+                            class="btn btn-primary btn-lg" 
+                            onclick="imprimirTicket('a4')" 
+                            id="btn-imprimir-ticket-a4"
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Imprimir en formato A4 (PDF)">
                         <i class="bi bi-file-pdf"></i> A4
                     </button>
                 </div>

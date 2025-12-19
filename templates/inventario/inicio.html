@@ -98,12 +98,15 @@
                        id="search-input"
                        value="{{ query }}" 
                        placeholder="Buscar o escanear código de barras..."
-                       autofocus>
+                       autofocus
+                       autocomplete="off"
+                       aria-label="Buscar productos"
+                       aria-describedby="search-help">
             </div>
-            <small class="text-muted">
+            <small class="text-muted" id="search-help">
                 <i class="bi bi-info-circle"></i> 
                 {% if es_admin %}
-                Escanea con lector de código de barras o presiona <kbd>F</kbd> para buscar
+                Escanea con lector de código de barras o presiona <kbd>Ctrl+K</kbd> para buscar
                 {% else %}
                 Escribe el nombre del producto o escanea su código de barras
                 {% endif %}
@@ -158,11 +161,19 @@
                 <!-- Selector de vista compacto -->
                 <div class="btn-group" role="group" aria-label="Vista">
                     <input type="radio" class="btn-check" name="vista" id="vistaGrid" value="grid" {% if vista == 'grid' %}checked{% endif %} onchange="this.form.submit()">
-                    <label class="btn btn-outline-secondary" for="vistaGrid" title="Cuadrícula">
+                    <label class="btn btn-outline-secondary" 
+                           for="vistaGrid" 
+                           data-bs-toggle="tooltip" 
+                           data-bs-placement="bottom" 
+                           title="Vista de cuadrícula (tarjetas)">
                         <i class="bi bi-grid-3x3-gap"></i>
                     </label>
                     <input type="radio" class="btn-check" name="vista" id="vistaLista" value="lista" {% if vista == 'lista' %}checked{% endif %} onchange="this.form.submit()">
-                    <label class="btn btn-outline-secondary" for="vistaLista" title="Lista">
+                    <label class="btn btn-outline-secondary" 
+                           for="vistaLista" 
+                           data-bs-toggle="tooltip" 
+                           data-bs-placement="bottom" 
+                           title="Vista de lista (compacta)">
                         <i class="bi bi-list-ul"></i>
                     </label>
                 </div>
@@ -170,13 +181,31 @@
                 {% if es_admin %}
                 <!-- Menú desplegable para exportar -->
                 <div class="dropdown">
-                    <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-outline-success dropdown-toggle" 
+                            type="button" 
+                            data-bs-toggle="dropdown" 
+                            aria-expanded="false"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="bottom" 
+                            title="Exporta la lista de productos en diferentes formatos">
                         <i class="bi bi-download"></i> Exportar
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'exportar_excel' %}"><i class="bi bi-file-earmark-excel text-success"></i> Excel (.xlsx)</a></li>
-                        <li><a class="dropdown-item" href="{% url 'exportar_pdf' %}"><i class="bi bi-file-earmark-pdf text-danger"></i> PDF</a></li>
-                        <li><a class="dropdown-item" href="{% url 'exportar_csv' %}"><i class="bi bi-file-earmark-spreadsheet text-info"></i> CSV</a></li>
+                        <li><a class="dropdown-item" 
+                               href="{% url 'exportar_excel' %}"
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="left" 
+                               title="Exportar a Excel (.xlsx)">Excel (.xlsx)</a></li>
+                        <li><a class="dropdown-item" 
+                               href="{% url 'exportar_pdf' %}"
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="left" 
+                               title="Exportar a PDF">PDF</a></li>
+                        <li><a class="dropdown-item" 
+                               href="{% url 'exportar_csv' %}"
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="left" 
+                               title="Exportar a CSV (valores separados por comas)">CSV</a></li>
                     </ul>
                 </div>
                 {% endif %}
@@ -251,7 +280,7 @@
     <div class="{% if vista == 'lista' %}col-12{% else %}col-md-4 col-lg-3{% endif %}">
         <div class="card card-producto h-100">
             {% if producto.imagen %}
-            <img src="{{ producto.imagen.url }}" class="card-img-top producto-imagen" alt="{{ producto.nombre }}">
+            <img data-src="{{ producto.imagen.url }}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%23f0f0f0' width='300' height='200'/%3E%3C/svg%3E" class="card-img-top producto-imagen lazy" alt="{{ producto.nombre }}" loading="lazy">
             {% else %}
             <div class="card-img-top d-flex align-items-center justify-content-center producto-placeholder">
                 <i class="bi bi-image producto-placeholder-icon"></i>
@@ -274,7 +303,9 @@
                                 data-producto-id="{{ producto.id }}"
                                 data-favorito="{% if producto.id in favoritos_ids %}true{% else %}false{% endif %}"
                                 onclick="toggleFavorito({{ producto.id }}, this)"
-                                title="{% if producto.id in favoritos_ids %}Quitar de favoritos{% else %}Agregar a favoritos{% endif %}">
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top" 
+                                title="{% if producto.id in favoritos_ids %}Quitar de favoritos - Accede rápido desde el menú{% else %}Agregar a favoritos - Accede rápido desde el menú{% endif %}">
                             <i class="bi {% if producto.id in favoritos_ids %}bi-star-fill text-warning{% else %}bi-star{% endif %}"></i>
                         </button>
                         {% if producto.categoria %}
@@ -360,7 +391,9 @@
                             data-producto-id="{{ producto.id }}"
                             data-favorito="{% if producto.id in favoritos_ids %}true{% else %}false{% endif %}"
                             onclick="toggleFavorito({{ producto.id }}, this)"
-                            title="{% if producto.id in favoritos_ids %}Quitar de favoritos{% else %}Agregar a favoritos{% endif %}">
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="{% if producto.id in favoritos_ids %}Quitar de favoritos - Accede rápido desde el menú{% else %}Agregar a favoritos - Accede rápido desde el menú{% endif %}">
                         <i class="bi {% if producto.id in favoritos_ids %}bi-star-fill text-warning{% else %}bi-star{% endif %} favorito-icon"></i>
                     </button>
                 </div>
