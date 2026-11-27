@@ -3,7 +3,7 @@
 ## Arquitectura del Sistema
 
 ### Stack Tecnológico
-- **Backend**: Django 5.2.8
+- **Backend**: Django 5.2 LTS
 - **Base de Datos**: SQLite (desarrollo) / PostgreSQL (producción)
 - **Frontend**: Bootstrap 5.3.0, JavaScript vanilla
 - **API**: Django REST Framework
@@ -221,14 +221,14 @@ python manage.py eliminar_imagenes
 ## Despliegue
 
 ### Requisitos
-- Python 3.8+
+- Python 3.11
 - PostgreSQL (producción)
 - Servidor web (Nginx/Apache)
 - Gunicorn/uWSGI
 
 ### Pasos de Despliegue
 1. Configurar variables de entorno
-2. Instalar dependencias: `pip install -r requirements.txt`
+2. Instalar las dependencias fijadas según la [guía STK-01B](docs/seguridad/STK_01B_DEPENDENCIAS_COMPATIBILIDAD.md).
 3. Ejecutar migraciones: `python manage.py migrate`
 4. Recopilar estáticos: `python manage.py collectstatic`
 5. Configurar servidor web

@@ -16,11 +16,14 @@ RUN apt-get update && apt-get install -y \
     libtesseract-dev \
     poppler-utils \
     libpoppler-cpp-dev \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements y instalar dependencias Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-bootstrap.txt requirements.txt ./
+RUN python -m pip install --no-cache-dir --only-binary=:all: --no-deps --require-hashes -r requirements-bootstrap.txt \
+    && python -m pip install --no-cache-dir --require-hashes -r requirements.txt \
+    && python -m pip check
 
 # Copiar el proyecto
 COPY . .

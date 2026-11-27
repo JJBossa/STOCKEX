@@ -81,7 +81,7 @@ REM Verificar que Python existe
 %PYTHON_CMD% --version >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo [ERROR] Python no encontrado. Por favor instale Python 3.8 o superior.
+    echo [ERROR] Python no encontrado. Instale Python 3.11.
     echo.
     pause
     exit /b 1
@@ -93,7 +93,9 @@ if errorlevel 1 (
     echo.
     echo [ERROR] Django no está instalado.
     echo Instalando dependencias...
-    %PYTHON_CMD% -m pip install -r "%PROJECT_DIR%\requirements.txt"
+    %PYTHON_CMD% -m pip install --only-binary=:all: --no-deps --require-hashes -r "%PROJECT_DIR%\requirements-bootstrap.txt"
+    if errorlevel 1 exit /b 1
+    %PYTHON_CMD% -m pip install --require-hashes -r "%PROJECT_DIR%\requirements.txt"
     if errorlevel 1 (
         echo.
         echo [ERROR] No se pudieron instalar las dependencias.

@@ -1,0 +1,33 @@
+# Dependencias directas. Regenerar requirements.txt con uv según la guía STK-01B.
+# Mantener Django en la serie 5.2 LTS.
+Django==5.2.19
+requests==2.34.2
+Pillow==13.0.0
+openpyxl==3.1.5
+reportlab==5.1.2
+pytesseract==0.3.13
+pdf2image==1.17.1
+python-dateutil==4.0.0
+opencv-python==5.1.0.95
+gunicorn==27.0.1
+whitenoise==6.12.0
+psycopg2-binary==2.9.13
+dj-database-url==3.1.2
+pytz==2026.6
+
+# Pruebas
+pytest-django==4.14.0
+pytest-cov==7.1.0
+pytest-factoryboy==2.8.1
+factory-boy==3.3.3
+
+# API REST
+djangorestframework==3.18.3
+djangorestframework-simplejwt==5.5.1
+django-filter==26.2
+drf-spectacular==0.30.0
+
+# Tareas y caché
+celery==5.6.3
+redis==8.2.0
+django-redis==7.0.0
