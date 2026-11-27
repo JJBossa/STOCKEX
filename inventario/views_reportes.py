@@ -17,12 +17,12 @@ from .models import (
     Producto, MovimientoStock, Categoria, Venta, ItemVenta,
     Cliente, CuentaPorCobrar, Almacen, OrdenCompra
 )
-from .utils import es_admin_bossa
+from .utils import es_administrador
 
 @login_required
 def reportes_avanzados(request):
     """Dashboard de reportes avanzados con gráficos y análisis"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -303,7 +303,7 @@ def dashboard_usuario_normal(request):
 @login_required
 def graficos_ventas(request):
     """Dashboard con gráficos de ventas para el admin - DEPRECADO: usar reportes_avanzados"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     

@@ -26,10 +26,12 @@
             </a>
             <div class="navbar-nav ms-auto d-flex align-items-center">
                 <!-- Botón de Ventas - Grande y Visible (solo para usuarios no-admin) -->
-                {% if user.username != 'bossa' %}
+                {% if not es_administrador_nav %}
+                {% if perms.inventario.view_venta %}
                 <a href="{% url 'punto_venta' %}" class="btn btn-success btn-lg me-3" style="font-weight: 600; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
                     <i class="bi bi-cash-register"></i> {% if t %}{{ t.Ventas }}{% else %}Ventas{% endif %}
                 </a>
+                {% endif %}
                 {% else %}
                 <!-- Menú Principal para Admin -->
                 <div class="dropdown me-2">
@@ -94,17 +96,26 @@
                         <i class="bi bi-person-circle"></i> {{ user.username }}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        {% if user.username == 'bossa' %}
+                        {% if es_administrador_nav %}
                         <li><a class="dropdown-item" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2"></i> {% if t %}{{ t.Dashboard }}{% else %}Dashboard{% endif %}</a></li>
                         {% else %}
                         <li><a class="dropdown-item" href="{% url 'dashboard_usuario' %}"><i class="bi bi-speedometer2"></i> {% if t %}{{ t.Dashboard }}{% else %}Dashboard{% endif %}</a></li>
                         {% endif %}
                         <li><hr class="dropdown-divider"></li>
+                        {% if perms.inventario.view_venta %}
                         <li><a class="dropdown-item" href="{% url 'listar_ventas' %}"><i class="bi bi-clock-history text-primary"></i> Historial de Ventas</a></li>
+                        {% endif %}
+                        {% if perms.inventario.view_cotizacion %}
                         <li><a class="dropdown-item" href="{% url 'listar_cotizaciones' %}"><i class="bi bi-file-earmark-text text-info"></i> Cotizaciones</a></li>
+                        {% endif %}
                         <li><a class="dropdown-item" href="{% url 'mis_favoritos' %}"><i class="bi bi-star text-warning"></i> Mis Favoritos</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Salir</a></li>
+                        <li>
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right"></i> Salir</button>
+                            </form>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -203,4 +214,3 @@
     {% block extra_js %}{% endblock %}
 </body>
 </html>
-

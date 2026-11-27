@@ -8,14 +8,13 @@ from django.utils import timezone
 from django.db import transaction
 from datetime import timedelta
 from .models import Producto, MovimientoStock
-from .utils import es_admin_bossa, registrar_cambio
+from .utils import es_administrador, registrar_cambio
+from .access import permiso_requerido
 
-@login_required
+@permiso_requerido('inventario.add_movimientostock', administrativo=True)
 @transaction.atomic
 def registrar_movimiento_stock(request, producto_id):
     """Registra un movimiento de stock (entrada/salida)"""
-    if not es_admin_bossa(request.user):
-        return JsonResponse({'error': 'No tienes permisos'}, status=403)
     
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
@@ -79,13 +78,9 @@ def registrar_movimiento_stock(request, producto_id):
     except Exception as e:
         return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
 
-@login_required
+@permiso_requerido('inventario.view_movimientostock')
 def listar_movimientos(request):
     """Lista todos los movimientos de stock"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para acceder a esta sección.')
-        return redirect('inicio')
-    
     movimientos = MovimientoStock.objects.select_related('producto', 'usuario').all()
     
     # Filtros
@@ -125,4 +120,3 @@ def listar_movimientos(request):
     }
     
     return render(request, 'inventario/movimientos_stock.html', context)
-

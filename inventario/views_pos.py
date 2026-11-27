@@ -1,38 +1,35 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q, Sum, Count, F
+from django.db.models import Sum
 from django.core.paginator import Paginator
-from django.utils import timezone
-from django.db import transaction
-from django.core.exceptions import ValidationError
-from datetime import timedelta
-from decimal import Decimal
-from .models import Producto, Venta, ItemVenta, MovimientoStock, Cliente, CuentaPorCobrar
-from .utils import es_admin_bossa, registrar_cambio, logger
+from .models import Producto, Cliente
+from .utils import es_administrador
+from .access import operaciones_financieras_suspendidas, permiso_requerido, ventas_visibles
 
-@login_required
+@permiso_requerido('inventario.view_venta')
 def punto_venta(request):
-    """Vista principal del punto de venta - Accesible para todos los usuarios"""
+    """Vista de consulta del punto de venta durante la suspensión."""
     
     # Obtener productos activos para búsqueda
     productos = Producto.objects.filter(activo=True).order_by('nombre')
     
     # Obtener clientes activos para selección
-    clientes = Cliente.objects.filter(activo=True).order_by('nombre')
+    clientes = Cliente.objects.none()
+    if request.user.has_perm('inventario.view_cliente'):
+        clientes = Cliente.objects.filter(activo=True).order_by('nombre')
     
     context = {
         'productos': productos,
         'clientes': clientes,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/punto_venta.html', context)
 
-@login_required
+@permiso_requerido('inventario.view_venta')
 def buscar_producto_pos(request):
-    """API para buscar producto por código de barras en el POS - Accesible para todos"""
+    """API para buscar productos por código de barras en el POS."""
     
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
@@ -80,178 +77,16 @@ def buscar_producto_pos(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
-@transaction.atomic
+@permiso_requerido('inventario.view_venta')
 def procesar_venta(request):
-    """Procesa una venta y descuenta el stock - Accesible para todos"""
-    
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
-    
-    try:
-        import json
-        items_data = json.loads(request.POST.get('items', '[]'))
-        subtotal = Decimal(request.POST.get('subtotal', '0'))
-        descuento = Decimal(request.POST.get('descuento', '0'))
-        total = Decimal(request.POST.get('total', '0'))
-        metodo_pago = request.POST.get('metodo_pago', 'efectivo')
-        monto_recibido = Decimal(request.POST.get('monto_recibido', '0'))
-        cambio = Decimal(request.POST.get('cambio', '0'))
-        notas = request.POST.get('notas', '')
-        cliente_id = request.POST.get('cliente_id', '') or None
-        es_credito = request.POST.get('es_credito', 'false') == 'true'
-        
-        if not items_data:
-            return JsonResponse({'error': 'No hay items en la venta'}, status=400)
-        
-        # Validar cliente si es crédito
-        cliente = None
-        if es_credito:
-            if not cliente_id:
-                return JsonResponse({'error': 'Se debe seleccionar un cliente para ventas a crédito'}, status=400)
-            try:
-                cliente = Cliente.objects.get(id=cliente_id, activo=True)
-            except Cliente.DoesNotExist:
-                return JsonResponse({'error': 'Cliente no encontrado'}, status=400)
-        
-        # Crear venta
-        venta = Venta.objects.create(
-            cliente=cliente,
-            usuario=request.user,
-            subtotal=subtotal,
-            descuento=descuento,
-            total=total,
-            metodo_pago=metodo_pago if not es_credito else 'credito',
-            monto_recibido=monto_recibido,
-            cambio=cambio,
-            es_credito=es_credito,
-            notas=notas
-        )
-        
-        # Procesar items y descontar stock
-        # Usar select_for_update() para bloquear registros y evitar condiciones de carrera
-        items_creados = []
-        productos_actualizados = []
-        
-        for item_data in items_data:
-            producto_id = item_data.get('producto_id')
-            cantidad = int(item_data.get('cantidad', 1))
-            precio_unitario = Decimal(item_data.get('precio', '0'))
-            
-            # Bloquear el registro del producto hasta que termine la transacción
-            # Esto previene que otro usuario venda el mismo producto simultáneamente
-            try:
-                producto = Producto.objects.select_for_update().get(id=producto_id)
-            except Producto.DoesNotExist:
-                venta.delete()
-                logger.error(f'Producto {producto_id} no encontrado al procesar venta', 
-                           extra={'user': request.user.username, 'venta_id': venta.id})
-                return JsonResponse({
-                    'error': f'Producto no encontrado (ID: {producto_id})'
-                }, status=400)
-            
-            # Verificar stock disponible ANTES de descontar
-            if producto.stock < cantidad:
-                venta.delete()  # Cancelar venta si no hay stock
-                logger.warning(f'Stock insuficiente para {producto.nombre}. Disponible: {producto.stock}, Solicitado: {cantidad}',
-                             extra={'user': request.user.username, 'producto_id': producto_id, 'venta_id': venta.id})
-                return JsonResponse({
-                    'error': f'Stock insuficiente para {producto.nombre}. Disponible: {producto.stock}, Solicitado: {cantidad}'
-                }, status=400)
-            
-            stock_anterior = producto.stock
-            producto.stock -= cantidad
-            producto.save()
-            productos_actualizados.append(producto)
-            
-            # Crear item de venta
-            item = ItemVenta.objects.create(
-                venta=venta,
-                producto=producto,
-                nombre_producto=producto.nombre,
-                cantidad=cantidad,
-                precio_unitario=precio_unitario,
-                stock_anterior=stock_anterior,
-                stock_despues=producto.stock
-            )
-            items_creados.append(item)
-            
-            # Registrar movimiento de stock
-            MovimientoStock.objects.create(
-                producto=producto,
-                tipo='salida',
-                cantidad=cantidad,
-                motivo='venta',
-                stock_anterior=stock_anterior,
-                stock_nuevo=producto.stock,
-                usuario=request.user,
-                notas=f'Venta #{venta.numero_venta}'
-            )
-            
-            # Registrar en historial
-            registrar_cambio(
-                producto,
-                request.user,
-                'stock',
-                'stock',
-                stock_anterior,
-                producto.stock,
-                f'Venta: {cantidad} unidades - Venta #{venta.numero_venta}'
-            )
-        
-        # Si es venta a crédito, crear cuenta por cobrar
-        if es_credito and cliente:
-            fecha_vencimiento = timezone.now().date() + timedelta(days=30)  # 30 días por defecto
-            
-            cuenta_por_cobrar = CuentaPorCobrar.objects.create(
-                cliente=cliente,
-                venta=venta,
-                monto_total=total,
-                fecha_emision=timezone.now().date(),
-                fecha_vencimiento=fecha_vencimiento,
-                notas=f'Venta #{venta.numero_venta}'
-            )
-            logger.info(f'Cuenta por cobrar creada para venta #{venta.numero_venta}', 
-                       extra={'user': request.user.username, 'cuenta_id': cuenta_por_cobrar.id})
-        
-        logger.info(f'Venta #{venta.numero_venta} procesada exitosamente. Total: ${venta.total}',
-                   extra={'user': request.user.username, 'venta_id': venta.id, 'total': float(venta.total)})
-        
-        return JsonResponse({
-            'success': True,
-            'venta_id': venta.id,
-            'numero_venta': venta.numero_venta,
-            'total': float(venta.total),
-            'es_credito': es_credito,
-            'mensaje': f'Venta #{venta.numero_venta} procesada exitosamente'
-        })
-        
-    except Producto.DoesNotExist as e:
-        logger.error(f'Producto no encontrado al procesar venta: {str(e)}',
-                    exc_info=True, extra={'user': request.user.username})
-        return JsonResponse({'error': 'Producto no encontrado'}, status=404)
-    except ValidationError as e:
-        logger.warning(f'Error de validación al procesar venta: {str(e)}',
-                      extra={'user': request.user.username})
-        return JsonResponse({'error': str(e)}, status=400)
-    except ValueError as e:
-        logger.warning(f'Error de valor al procesar venta: {str(e)}',
-                      extra={'user': request.user.username})
-        return JsonResponse({'error': f'Datos inválidos: {str(e)}'}, status=400)
-    except Exception as e:
-        logger.error(f'Error inesperado al procesar venta: {str(e)}',
-                    exc_info=True, extra={'user': request.user.username})
-        return JsonResponse({'error': 'Error interno del servidor. Por favor, intente nuevamente.'}, status=500)
+    return operaciones_financieras_suspendidas()
 
-@login_required
+
+@permiso_requerido('inventario.view_venta')
 def listar_ventas(request):
     """Lista todas las ventas - Usuarios normales solo ven sus propias ventas"""
     
-    # Usuarios normales solo ven sus propias ventas
-    if es_admin_bossa(request.user):
-        ventas = Venta.objects.select_related('usuario').prefetch_related('items').all()
-    else:
-        ventas = Venta.objects.select_related('usuario').prefetch_related('items').filter(usuario=request.user)
+    ventas = ventas_visibles(request.user).select_related('usuario').prefetch_related('items')
     
     # Filtros
     fecha_desde = request.GET.get('fecha_desde', '')
@@ -285,95 +120,30 @@ def listar_ventas(request):
         'numero_venta': numero_venta,
         'total_ventas': total_ventas,
         'total_ventas_count': total_ventas_count,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/listar_ventas.html', context)
 
-@login_required
+@permiso_requerido('inventario.view_venta')
 def detalle_venta(request, venta_id):
     """Detalle de una venta - Usuarios normales solo ven sus propias ventas"""
-    if es_admin_bossa(request.user):
-        venta = get_object_or_404(Venta, id=venta_id)
-    else:
-        venta = get_object_or_404(Venta, id=venta_id, usuario=request.user)
+    venta = get_object_or_404(ventas_visibles(request.user), id=venta_id)
     items = venta.items.select_related('producto').all()
     
     context = {
         'venta': venta,
         'items': items,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_venta.html', context)
 
-@login_required
+@permiso_requerido('inventario.change_venta')
 def cancelar_venta(request, venta_id):
-    """Cancela una venta y restaura el stock - Solo admin o el mismo vendedor"""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
-    
-    try:
-        # Usuarios normales solo pueden cancelar sus propias ventas
-        if es_admin_bossa(request.user):
-            venta = get_object_or_404(Venta, id=venta_id)
-        else:
-            venta = get_object_or_404(Venta, id=venta_id, usuario=request.user)
-        
-        if venta.cancelada:
-            return JsonResponse({'error': 'La venta ya está cancelada'}, status=400)
-        
-        # Restaurar stock de cada item
-        for item in venta.items.all():
-            if item.producto:
-                stock_anterior = item.producto.stock
-                item.producto.stock += item.cantidad
-                item.producto.save()
-                
-                # Registrar movimiento
-                MovimientoStock.objects.create(
-                    producto=item.producto,
-                    tipo='entrada',
-                    cantidad=item.cantidad,
-                    motivo='devolucion_cliente',
-                    stock_anterior=stock_anterior,
-                    stock_nuevo=item.producto.stock,
-                    usuario=request.user,
-                    notas=f'Cancelación de venta #{venta.numero_venta}'
-                )
-        
-        venta.cancelada = True
-        venta.save()
-        
-        return JsonResponse({
-            'success': True,
-            'mensaje': f'Venta #{venta.numero_venta} cancelada exitosamente. Stock restaurado.'
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': f'Error al cancelar venta: {str(e)}'}, status=500)
+    return operaciones_financieras_suspendidas()
+
 
 @login_required
 def limpiar_historial_ventas(request):
-    """Elimina todas las ventas del sistema - Solo admin"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('listar_ventas')
-    
-    if request.method == 'POST':
-        try:
-            # Contar ventas antes de eliminar
-            total_ventas = Venta.objects.count()
-            
-            # Eliminar todas las ventas (esto también eliminará los items relacionados por CASCADE)
-            Venta.objects.all().delete()
-            
-            messages.success(request, f'Se eliminaron {total_ventas} venta(s) del historial.')
-            return redirect('listar_ventas')
-        except Exception as e:
-            messages.error(request, f'Error al limpiar el historial: {str(e)}')
-            return redirect('listar_ventas')
-    
-    # Si es GET, redirigir
-    return redirect('listar_ventas')
-
+    return JsonResponse({'error': 'El historial de ventas no se puede eliminar.'}, status=403)

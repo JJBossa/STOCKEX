@@ -14,81 +14,12 @@ from .constants import CACHE_TIMEOUT_LARGO
 logger = logging.getLogger('inventario')
 
 
-def es_admin_bossa(user: User) -> bool:
-    """
-    Verifica si el usuario es el admin bossa o tiene permisos de administrador
-    
-    MANTIENE COMPATIBILIDAD HACIA ATRÁS:
-    - Si el usuario es 'bossa', retorna True
-    - Si el usuario está en el grupo 'Administrador', retorna True
-    - Si el usuario es superuser, retorna True
-    
-    Args:
-        user: Usuario de Django
-        
-    Returns:
-        bool: True si es admin, False en caso contrario
-    """
-    if not user or not user.is_authenticated:
-        return False
-    
-    # Compatibilidad: usuario 'bossa' siempre es admin
-    if user.username == 'bossa':
-        return True
-    
-    # Verificar si es superuser
-    if user.is_superuser:
-        return True
-    
-    # Verificar si está en el grupo Administrador
-    if user.groups.filter(name='Administrador').exists():
-        return True
-    
-    return False
-
-
-def tiene_permiso(user: User, permiso_codename: str, model_class=None) -> bool:
-    """
-    Verifica si un usuario tiene un permiso específico
-    
-    Args:
-        user: Usuario de Django
-        permiso_codename: Código del permiso (ej: 'add_producto', 'change_venta')
-        model_class: Clase del modelo (opcional, para verificar content type)
-        
-    Returns:
-        bool: True si tiene el permiso, False en caso contrario
-    """
-    if not user or not user.is_authenticated:
-        return False
-    
-    # Superuser y admin bossa tienen todos los permisos
-    if es_admin_bossa(user):
-        return True
-    
-    # Verificar permiso directamente
-    if model_class:
-        from django.contrib.contenttypes.models import ContentType
-        ct = ContentType.objects.get_for_model(model_class)
-        permiso = f"{ct.app_label}.{permiso_codename}"
-        return user.has_perm(permiso)
-    
-    # Verificar permiso genérico
-    return user.has_perm(permiso_codename)
-
-
-def es_vendedor(user: User) -> bool:
-    """Verifica si el usuario es vendedor"""
-    if not user or not user.is_authenticated:
-        return False
-    return user.groups.filter(name='Vendedor').exists() or es_admin_bossa(user)
-
-
-def es_almacenero(user: User) -> bool:
-    """Verifica si el usuario es almacenero"""
-    if not user or not user.is_authenticated:
-        return False
-    return user.groups.filter(name='Almacenero').exists() or es_admin_bossa(user)
+def es_administrador(user: User) -> bool:
+    """Acceso a módulos administrativos heredados y navegación."""
+    return bool(
+        user and user.is_authenticated and user.is_active
+        and (user.is_superuser or user.groups.filter(name='Administrador').exists())
+    )
 
 
 def normalizar_texto(texto: Optional[str]) -> str:
@@ -225,4 +156,3 @@ def invalidar_cache_categorias() -> None:
     """
     cache.delete('categorias_list')
     logger.debug('Cache de categorías invalidado')
-

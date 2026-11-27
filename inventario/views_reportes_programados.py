@@ -8,13 +8,13 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db.models import Q
 from .models import ReporteProgramado
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
 
 
 @login_required
 def listar_reportes_programados(request):
     """Lista todos los reportes programados"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -49,7 +49,7 @@ def listar_reportes_programados(request):
 @login_required
 def crear_reporte_programado(request):
     """Crear un nuevo reporte programado"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -94,7 +94,7 @@ def crear_reporte_programado(request):
 @login_required
 def detalle_reporte_programado(request, reporte_id):
     """Detalle de un reporte programado"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -110,7 +110,7 @@ def detalle_reporte_programado(request, reporte_id):
 @login_required
 def editar_reporte_programado(request, reporte_id):
     """Editar un reporte programado"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -151,7 +151,7 @@ def editar_reporte_programado(request, reporte_id):
 @login_required
 def eliminar_reporte_programado(request, reporte_id):
     """Eliminar un reporte programado"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -173,7 +173,7 @@ def eliminar_reporte_programado(request, reporte_id):
 @login_required
 def ejecutar_reporte_ahora(request, reporte_id):
     """Ejecutar un reporte programado inmediatamente"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -211,4 +211,3 @@ def ejecutar_reporte_ahora(request, reporte_id):
         messages.error(request, f'Error al ejecutar reporte: {str(e)}')
     
     return redirect('detalle_reporte_programado', reporte_id=reporte.id)
-

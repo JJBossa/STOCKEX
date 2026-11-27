@@ -55,18 +55,18 @@ class TestProductoViews:
         assert response.status_code == 200
         assert 'productos' in response.context
     
-    def test_agregar_producto_requiere_admin_bossa(self, client, normal_user):
-        """Test que agregar producto requiere ser admin bossa"""
+    def test_agregar_producto_requiere_permiso(self, client, normal_user):
+        """Test que agregar producto requiere autorización"""
         client.force_login(normal_user)
         response = client.get(reverse('agregar_producto'))
         # Debería redirigir o mostrar error
         assert response.status_code in [302, 403]
     
-    def test_agregar_producto_admin_bossa(self, client, bossa_user, categoria):
-        """Test que bossa puede acceder a agregar producto"""
+    def test_nombre_historico_no_otorga_permiso_para_agregar_producto(self, client, bossa_user, categoria):
+        """El nombre histórico por sí solo no concede acceso administrativo."""
         client.force_login(bossa_user)
         response = client.get(reverse('agregar_producto'))
-        assert response.status_code == 200
+        assert response.status_code == 403
 
 
 @pytest.mark.django_db
@@ -87,4 +87,3 @@ class TestAPIViews:
         data = response.json()
         assert 'productos' in data
         assert len(data['productos']) > 0
-

@@ -9,7 +9,8 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.utils import timezone
 from .models import Almacen, StockAlmacen, Producto, Transferencia, ItemTransferencia
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
+from .access import permiso_requerido
 
 
 @login_required
@@ -33,7 +34,7 @@ def listar_almacenes(request):
     context = {
         'almacenes': almacenes,
         'activo': activo,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/listar_almacenes.html', context)
@@ -42,7 +43,7 @@ def listar_almacenes(request):
 @login_required
 def crear_almacen(request):
     """Crear un nuevo almacén"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('listar_almacenes')
     
@@ -113,7 +114,7 @@ def detalle_almacen(request, almacen_id):
         'stock_bajo': stock_bajo,
         'total_productos': total_productos,
         'productos_stock_bajo': productos_stock_bajo,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_almacen.html', context)
@@ -122,7 +123,7 @@ def detalle_almacen(request, almacen_id):
 @login_required
 def editar_almacen(request, almacen_id):
     """Editar un almacén"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('listar_almacenes')
     
@@ -151,7 +152,7 @@ def editar_almacen(request, almacen_id):
     })
 
 
-@login_required
+@permiso_requerido('inventario.add_transferencia', administrativo=True)
 def crear_transferencia(request):
     """Crear una transferencia entre almacenes"""
     if request.method == 'POST':
@@ -217,7 +218,7 @@ def crear_transferencia(request):
     return render(request, 'inventario/crear_transferencia.html', {
         'almacenes': almacenes,
         'productos': productos,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     })
 
 
@@ -233,7 +234,7 @@ def detalle_transferencia(request, transferencia_id):
     context = {
         'transferencia': transferencia,
         'items': items,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_transferencia.html', context)
@@ -242,7 +243,7 @@ def detalle_transferencia(request, transferencia_id):
 @login_required
 def completar_transferencia(request, transferencia_id):
     """Completar una transferencia (actualizar stock)"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('listar_almacenes')
     
@@ -293,4 +294,3 @@ def completar_transferencia(request, transferencia_id):
         messages.error(request, f'Error al completar transferencia: {str(e)}')
     
     return redirect('detalle_transferencia', transferencia_id=transferencia.id)
-

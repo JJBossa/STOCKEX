@@ -63,8 +63,7 @@
                            class="form-control" 
                            name="password" 
                            required 
-                           minlength="6"
-                           placeholder="Mínimo 6 caracteres">
+                           autocomplete="new-password">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Confirmar Contraseña <span class="text-danger">*</span></label>
@@ -72,42 +71,12 @@
                            class="form-control" 
                            name="password_confirm" 
                            required 
-                           minlength="6"
-                           placeholder="Repite la contraseña">
+                           autocomplete="new-password">
                 </div>
             </div>
             
-            <div class="row mb-3">
-                <div class="col-md-12">
-                    <div class="form-check">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               name="is_staff" 
-                               id="is_staff">
-                        <label class="form-check-label" for="is_staff">
-                            <i class="bi bi-shield"></i> Staff (acceso al panel de administración)
-                        </label>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="row mb-3">
-                <div class="col-md-12">
-                    <div class="form-check">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               name="is_superuser" 
-                               id="is_superuser">
-                        <label class="form-check-label" for="is_superuser">
-                            <i class="bi bi-shield-check"></i> Superusuario (todos los permisos)
-                        </label>
-                    </div>
-                    <small class="form-text text-muted">
-                        ⚠️ Los superusuarios tienen acceso completo al sistema y pueden gestionar usuarios.
-                    </small>
-                </div>
-            </div>
-            
+            <p class="text-muted">La cuenta se creará con el rol Vendedor.</p>
+
             <div class="d-flex justify-content-end gap-2">
                 <a href="{% url 'listar_usuarios' %}" class="btn btn-secondary">
                     <i class="bi bi-x-circle"></i> Cancelar
@@ -124,4 +93,3 @@
 {% block ayuda %}
 {% include 'inventario/ayuda_contextual.html' %}
 {% endblock %}
-

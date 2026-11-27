@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
+from django.core.management.utils import get_random_secret_key
+
 # Importar dj_database_url solo si está disponible (para producción en Render)
 try:
     import dj_database_url
@@ -33,24 +35,12 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # En producción, SECRET_KEY DEBE estar configurada como variable de entorno
-# En desarrollo local, se permite un fallback solo si DEBUG=True
+# En desarrollo se genera una clave efímera si no se configura una explícita.
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
-    if DEBUG:
-        # Solo en desarrollo: usar una clave por defecto (NO SEGURO para producción)
-        SECRET_KEY = 'django-insecure-dev-only-_mu8+q+qb_!n$24+1)j4qg-1tom$(f2j13zm8_5uy&bg#za=%#'
-        import warnings
-        warnings.warn(
-            "SECRET_KEY no configurada. Usando clave de desarrollo insegura. "
-            "Configura SECRET_KEY como variable de entorno en producción.",
-            UserWarning
-        )
-    else:
-        # En producción, fallar si no hay SECRET_KEY
-        raise ValueError(
-            "SECRET_KEY no configurada. "
-            "Configura la variable de entorno SECRET_KEY antes de ejecutar en producción."
-        )
+    if not DEBUG:
+        raise ValueError('Configura SECRET_KEY antes de iniciar Django con DEBUG=False.')
+    SECRET_KEY = get_random_secret_key()
 
 # ALLOWED_HOSTS para uso local: localhost, IP local, y red local
 # Permite acceso desde el mismo PC y otros dispositivos en la red local
@@ -109,6 +99,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.i18n',  # Para LANGUAGE_CODE en templates
                 'inventario.context_processors.translations',  # Para traducciones personalizadas
+                'inventario.context_processors.permisos_navegacion',
             ],
         },
     },
@@ -439,6 +430,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
+    'CHECK_REVOKE_TOKEN': True,
 }
 
 # Email Configuration (para reportes programados)

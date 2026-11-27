@@ -65,9 +65,10 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-5. Crea un superusuario (para acceder al admin y hacer login):
+5. Configura los roles y crea un superusuario con contraseña interactiva:
 ```bash
-python manage.py createsuperuser
+python manage.py crear_grupos_permisos
+python manage.py crear_superusuario --username <usuario>
 ```
 
 6. Importa los productos desde el PDF:
@@ -189,14 +190,14 @@ pytest tests/test_views.py
 ## 🔒 Seguridad
 
 ### Configuración Automática
-El sistema detecta automáticamente si está en desarrollo o producción:
+Consulta la [guía de seguridad STK-01A](docs/seguridad/STK_01A_SEGURIDAD_USUARIOS_PERMISOS.md) para aprovisionar cuentas y revisar el alcance de los roles. La configuración se controla por entorno:
 
 - **Desarrollo Local (DEBUG=True)**: Configuraciones relajadas para facilitar el uso
 - **Producción (DEBUG=False)**: Configuraciones estrictas de seguridad
 
 ### Variables de Entorno Recomendadas para Producción
 ```bash
-SECRET_KEY=tu-clave-secreta-muy-larga-y-aleatoria
+# Inyecta SECRET_KEY desde el gestor de secretos del entorno.
 DEBUG=False
 ALLOWED_HOSTS=tu-dominio.com,www.tu-dominio.com
 SECURE_HSTS_SECONDS=31536000
@@ -243,4 +244,3 @@ Juan Jose Bossa Canto
 ---
 
 **¿Necesitas ayuda?** Consulta la [Guía de Usuario](GUIA_USUARIO.md) o la [Documentación Técnica](DOCUMENTACION_TECNICA.md).
-

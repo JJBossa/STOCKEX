@@ -9,9 +9,6 @@
         <a href="{% url 'inicio' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Volver al Inicio
         </a>
-        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalPago">
-            <i class="bi bi-cash"></i> Registrar Pago
-        </button>
         <a href="{% url 'listar_cuentas_cobrar' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>
@@ -90,52 +87,4 @@
     </div>
 </div>
 
-<!-- Modal Pago -->
-<div class="modal fade" id="modalPago" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Registrar Pago</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'registrar_pago' cuenta.id %}">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Monto *</label>
-                        <input type="number" name="monto" class="form-control" required min="0.01" max="{{ cuenta.saldo_pendiente }}" step="0.01">
-                        <small class="text-muted">Saldo pendiente: ${{ cuenta.saldo_pendiente|floatformat:0 }}</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Fecha de Pago</label>
-                        <input type="date" name="fecha_pago" class="form-control" value="{{ 'now'|date:'Y-m-d' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Método de Pago</label>
-                        <select name="metodo_pago" class="form-select">
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                            <option value="cheque">Cheque</option>
-                            <option value="tarjeta">Tarjeta</option>
-                            <option value="otro">Otro</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Referencia</label>
-                        <input type="text" name="referencia" class="form-control" placeholder="Número de cheque, transferencia, etc.">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Notas</label>
-                        <textarea name="notas" class="form-control" rows="2"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Registrar Pago</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock %}
-

@@ -50,12 +50,6 @@
                 }
             }
             
-            // F3: Procesar venta
-            if (e.key === 'F3') {
-                e.preventDefault();
-                procesarVenta();
-            }
-            
             // F4: Focus en búsqueda de productos
             if (e.key === 'F4') {
                 e.preventDefault();
@@ -237,10 +231,6 @@
                                     <td>Limpiar Carrito</td>
                                 </tr>
                                 <tr>
-                                    <td><kbd>F3</kbd></td>
-                                    <td>Procesar Venta</td>
-                                </tr>
-                                <tr>
                                     <td><kbd>F4</kbd></td>
                                     <td>Buscar Producto</td>
                                 </tr>
@@ -307,4 +297,3 @@
         });
     }
 })();
-

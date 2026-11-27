@@ -136,25 +136,6 @@
     </div>
     
     <div class="col-md-4">
-        {% if devolucion.estado == 'pendiente' %}
-        <div class="card">
-            <div class="card-header bg-warning text-white">
-                <h5 class="mb-0">Acciones</h5>
-            </div>
-            <div class="card-body">
-                <form method="post" action="{% url 'procesar_devolucion' devolucion.id %}" class="mb-3">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-success w-100" onclick="return confirm('¿Estás seguro de procesar esta devolución? El stock se actualizará y se procesará el reembolso.')">
-                        <i class="bi bi-check-circle"></i> Procesar Devolución
-                    </button>
-                </form>
-                
-                <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#modalRechazar">
-                    <i class="bi bi-x-circle"></i> Rechazar Devolución
-                </button>
-            </div>
-        </div>
-        {% endif %}
         
         <div class="card mt-3">
             <div class="card-body">
@@ -167,7 +148,7 @@
                 </p>
                 {% elif devolucion.estado == 'pendiente' %}
                 <p class="text-warning mt-2">
-                    <i class="bi bi-exclamation-triangle"></i> Al procesar, se actualizará el stock de los productos devueltos.
+                    <i class="bi bi-exclamation-triangle"></i> El procesamiento de devoluciones está suspendido.
                 </p>
                 {% endif %}
             </div>
@@ -175,29 +156,4 @@
     </div>
 </div>
 
-<!-- Modal para Rechazar -->
-<div class="modal fade" id="modalRechazar" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Rechazar Devolución</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'rechazar_devolucion' devolucion.id %}">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="motivo_rechazo" class="form-label">Motivo del Rechazo:</label>
-                        <textarea name="motivo_rechazo" id="motivo_rechazo" class="form-control" rows="3" required placeholder="Explica por qué se rechaza esta devolución..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger">Rechazar Devolución</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock %}
-

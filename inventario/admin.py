@@ -1,5 +1,8 @@
 from django.contrib import admin
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
+from django.contrib.auth.models import Group, User
 from django.utils.html import format_html
+from .utils import es_administrador
 from .models import (
     Producto, Categoria, HistorialCambio, Factura, ItemFactura, Proveedor, 
     ProductoFavorito, MovimientoStock, Venta, ItemVenta, Cotizacion, 
@@ -8,8 +11,67 @@ from .models import (
     ItemOrdenCompra, RecepcionMercancia
 )
 
+class AdministracionDeAccesos:
+    """La gestión de roles y privilegios queda reservada a superusuarios."""
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+class AdministracionDeUsuarios(AdministracionDeAccesos, UserAdmin):
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class AdministracionDeGrupos(AdministracionDeAccesos, GroupAdmin):
+    pass
+
+
+admin.site.unregister(User)
+admin.site.register(User, AdministracionDeUsuarios)
+admin.site.unregister(Group)
+admin.site.register(Group, AdministracionDeGrupos)
+
+
+class HistorialFinancieroSoloLectura:
+    def has_view_permission(self, request, obj=None):
+        return es_administrador(request.user) and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class CambiosSoloAdministrador:
+    def has_add_permission(self, request):
+        return es_administrador(request.user) and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return es_administrador(request.user) and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return es_administrador(request.user) and super().has_delete_permission(request, obj)
+
+
 @admin.register(Categoria)
-class CategoriaAdmin(admin.ModelAdmin):
+class CategoriaAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('nombre', 'color_preview', 'producto_count', 'fecha_creacion')
     search_fields = ('nombre',)
     ordering = ('nombre',)
@@ -26,7 +88,7 @@ class CategoriaAdmin(admin.ModelAdmin):
     producto_count.short_description = "Productos"
 
 @admin.register(Producto)
-class ProductoAdmin(admin.ModelAdmin):
+class ProductoAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('nombre', 'sku', 'categoria', 'precio_compra', 'precio', 'precio_promo', 'margen_display', 'stock', 'stock_bajo_indicator', 'fecha_actualizacion', 'imagen_preview')
     list_filter = ('categoria', 'activo', 'fecha_creacion', 'stock')
     search_fields = ('nombre', 'sku', 'descripcion')
@@ -129,7 +191,7 @@ class ProductoFavoritoAdmin(admin.ModelAdmin):
     ordering = ('-fecha_agregado',)
 
 @admin.register(MovimientoStock)
-class MovimientoStockAdmin(admin.ModelAdmin):
+class MovimientoStockAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('producto', 'tipo', 'cantidad', 'motivo', 'stock_anterior', 'stock_nuevo', 'usuario', 'fecha')
     list_filter = ('tipo', 'motivo', 'fecha')
     search_fields = ('producto__nombre', 'usuario__username', 'notas')
@@ -137,14 +199,14 @@ class MovimientoStockAdmin(admin.ModelAdmin):
     ordering = ('-fecha',)
     date_hierarchy = 'fecha'
 
-class ItemVentaInline(admin.TabularInline):
+class ItemVentaInline(HistorialFinancieroSoloLectura, admin.TabularInline):
     model = ItemVenta
     extra = 0
     readonly_fields = ('subtotal', 'stock_anterior', 'stock_despues')
     fields = ('producto', 'nombre_producto', 'cantidad', 'precio_unitario', 'subtotal', 'stock_anterior', 'stock_despues')
 
 @admin.register(Venta)
-class VentaAdmin(admin.ModelAdmin):
+class VentaAdmin(HistorialFinancieroSoloLectura, admin.ModelAdmin):
     list_display = ('numero_venta', 'fecha', 'usuario', 'total', 'metodo_pago', 'cancelada', 'items_count')
     list_filter = ('metodo_pago', 'cancelada', 'fecha')
     search_fields = ('numero_venta', 'usuario__username')
@@ -158,7 +220,7 @@ class VentaAdmin(admin.ModelAdmin):
     items_count.short_description = "Items"
 
 @admin.register(ItemVenta)
-class ItemVentaAdmin(admin.ModelAdmin):
+class ItemVentaAdmin(HistorialFinancieroSoloLectura, admin.ModelAdmin):
     list_display = ('venta', 'producto', 'nombre_producto', 'cantidad', 'precio_unitario', 'subtotal')
     list_filter = ('venta__fecha',)
     search_fields = ('nombre_producto', 'venta__numero_venta')
@@ -239,7 +301,7 @@ class ClienteAdmin(admin.ModelAdmin):
     saldo_pendiente_display.short_description = "Saldo Pendiente"
 
 
-class PagoClienteInline(admin.TabularInline):
+class PagoClienteInline(HistorialFinancieroSoloLectura, admin.TabularInline):
     model = PagoCliente
     extra = 0
     readonly_fields = ('fecha_registro',)
@@ -247,7 +309,7 @@ class PagoClienteInline(admin.TabularInline):
 
 
 @admin.register(CuentaPorCobrar)
-class CuentaPorCobrarAdmin(admin.ModelAdmin):
+class CuentaPorCobrarAdmin(HistorialFinancieroSoloLectura, admin.ModelAdmin):
     list_display = ('numero_documento', 'cliente', 'monto_total', 'monto_pagado', 'saldo_pendiente_display', 'fecha_vencimiento', 'estado', 'esta_vencida_display')
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
     search_fields = ('numero_documento', 'cliente__nombre', 'cliente__rut')
@@ -270,7 +332,7 @@ class CuentaPorCobrarAdmin(admin.ModelAdmin):
 
 
 @admin.register(PagoCliente)
-class PagoClienteAdmin(admin.ModelAdmin):
+class PagoClienteAdmin(HistorialFinancieroSoloLectura, admin.ModelAdmin):
     list_display = ('cuenta_por_cobrar', 'monto', 'fecha_pago', 'metodo_pago', 'usuario', 'fecha_registro')
     list_filter = ('metodo_pago', 'fecha_pago', 'fecha_registro')
     search_fields = ('cuenta_por_cobrar__numero_documento', 'cuenta_por_cobrar__cliente__nombre')
@@ -279,7 +341,7 @@ class PagoClienteAdmin(admin.ModelAdmin):
 
 
 @admin.register(Almacen)
-class AlmacenAdmin(admin.ModelAdmin):
+class AlmacenAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('nombre', 'codigo', 'responsable', 'activo', 'fecha_creacion')
     list_filter = ('activo', 'fecha_creacion')
     search_fields = ('nombre', 'codigo', 'responsable')
@@ -287,7 +349,7 @@ class AlmacenAdmin(admin.ModelAdmin):
 
 
 @admin.register(StockAlmacen)
-class StockAlmacenAdmin(admin.ModelAdmin):
+class StockAlmacenAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('producto', 'almacen', 'cantidad', 'stock_minimo', 'stock_bajo_indicator', 'fecha_actualizacion')
     list_filter = ('almacen', 'fecha_actualizacion')
     search_fields = ('producto__nombre', 'almacen__nombre')
@@ -307,7 +369,7 @@ class ItemTransferenciaInline(admin.TabularInline):
 
 
 @admin.register(Transferencia)
-class TransferenciaAdmin(admin.ModelAdmin):
+class TransferenciaAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('numero_transferencia', 'almacen_origen', 'almacen_destino', 'fecha_solicitud', 'fecha_transferencia', 'estado', 'usuario')
     list_filter = ('estado', 'fecha_solicitud', 'almacen_origen', 'almacen_destino')
     search_fields = ('numero_transferencia', 'almacen_origen__nombre', 'almacen_destino__nombre')
@@ -324,7 +386,7 @@ class ItemOrdenCompraInline(admin.TabularInline):
 
 
 @admin.register(OrdenCompra)
-class OrdenCompraAdmin(admin.ModelAdmin):
+class OrdenCompraAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('numero_orden', 'proveedor', 'fecha_orden', 'fecha_esperada', 'total', 'estado', 'usuario', 'fecha_creacion')
     list_filter = ('estado', 'fecha_orden', 'fecha_creacion')
     search_fields = ('numero_orden', 'proveedor__nombre')
@@ -334,7 +396,7 @@ class OrdenCompraAdmin(admin.ModelAdmin):
 
 
 @admin.register(RecepcionMercancia)
-class RecepcionMercanciaAdmin(admin.ModelAdmin):
+class RecepcionMercanciaAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
     list_display = ('orden_compra', 'almacen', 'fecha_recepcion', 'usuario')
     list_filter = ('almacen', 'fecha_recepcion')
     search_fields = ('orden_compra__numero_orden', 'almacen__nombre')

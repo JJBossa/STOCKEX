@@ -2,6 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.debug import sensitive_post_parameters
+from django.views.decorators.http import require_POST
 from django.db.models import Q, F, Sum, Count, Case, When, IntegerField
 from django.core.paginator import Paginator
 from django.contrib import messages
@@ -14,8 +17,10 @@ from django.core.cache import cache
 from datetime import timedelta
 from .models import Producto, Categoria, HistorialCambio, ProductoFavorito, MovimientoStock
 from .forms import ProductoForm, CategoriaForm
-from .utils import es_admin_bossa, normalizar_texto, registrar_cambio, logger, get_categorias_cached
+from .utils import es_administrador, normalizar_texto, registrar_cambio, logger, get_categorias_cached
+from .access import permiso_requerido
 
+@sensitive_post_parameters('password')
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('inicio')
@@ -31,6 +36,8 @@ def login_view(request):
     
     return render(request, 'inventario/login.html', {'form': form})
 
+@require_POST
+@csrf_protect
 @login_required
 def logout_view(request):
     logout(request)
@@ -38,13 +45,9 @@ def logout_view(request):
 
 # registrar_cambio ahora está en utils.py
 
-@login_required
+@permiso_requerido('inventario.add_producto', administrativo=True)
 def agregar_producto(request):
-    """Vista para agregar un nuevo producto (solo para bossa)"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('inicio')
-    
+    """Vista para agregar un nuevo producto (requiere permiso de Django)"""
     if request.method == 'POST':
         form = ProductoForm(request.POST, request.FILES)
         if form.is_valid():
@@ -62,13 +65,9 @@ def agregar_producto(request):
         'es_admin': True,
     })
 
-@login_required
+@permiso_requerido('inventario.change_producto', administrativo=True)
 def editar_producto(request, producto_id):
-    """Vista para editar un producto existente (solo para bossa)"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('inicio')
-    
+    """Vista para editar un producto existente (requiere permiso de Django)"""
     producto = get_object_or_404(Producto, id=producto_id)
     producto_original = Producto.objects.get(id=producto_id)
     
@@ -129,13 +128,9 @@ def editar_producto(request, producto_id):
         'es_admin': True,
     })
 
-@login_required
+@permiso_requerido('inventario.delete_producto', administrativo=True)
 def eliminar_producto(request, producto_id):
-    """Vista para eliminar un producto (solo para bossa)"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('inicio')
-    
+    """Vista para eliminar un producto (requiere permiso de Django)"""
     producto = get_object_or_404(Producto, id=producto_id)
     
     if request.method == 'POST':
@@ -346,18 +341,15 @@ def inicio(request):
         'total_resultados': total_resultados,  # Pre-calculado para evitar query en template
         'num_pages': num_pages,  # Pre-calculado para evitar query en template
         'page_range': page_range,  # Pre-calculado para evitar query en template
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
         'favoritos_ids': favoritos_ids,  # IDs de productos favoritos
     }
     
     return render(request, 'inventario/inicio.html', context)
 
-@login_required
+@permiso_requerido('inventario.change_producto', administrativo=True)
 def actualizar_stock_rapido(request, producto_id):
     """Vista AJAX para actualizar stock rápidamente con botones +/-"""
-    if not es_admin_bossa(request.user):
-        return JsonResponse({'error': 'No tienes permisos'}, status=403)
-    
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
     

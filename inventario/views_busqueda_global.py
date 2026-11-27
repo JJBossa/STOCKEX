@@ -10,7 +10,8 @@ from .models import (
     Producto, Cliente, Venta, Cotizacion, 
     HistorialBusqueda, LogAccion
 )
-from .utils import normalizar_texto, logger, es_admin_bossa
+from .utils import normalizar_texto, logger, es_administrador
+from .access import ventas_visibles
 import json
 
 def get_client_ip(request):
@@ -61,7 +62,7 @@ def busqueda_global(request):
                 for p in productos
             ]
         
-        if tipo == 'todos' or tipo == 'clientes':
+        if tipo in ('todos', 'clientes') and request.user.has_perm('inventario.view_cliente'):
             clientes = Cliente.objects.filter(
                 activo=True
             ).filter(
@@ -84,8 +85,8 @@ def busqueda_global(request):
                 for c in clientes
             ]
         
-        if tipo == 'todos' or tipo == 'ventas':
-            ventas = Venta.objects.filter(
+        if tipo in ('todos', 'ventas') and request.user.has_perm('inventario.view_venta'):
+            ventas = ventas_visibles(request.user).filter(
                 cancelada=False
             ).filter(
                 Q(numero_venta__icontains=query) |
@@ -106,7 +107,7 @@ def busqueda_global(request):
                 for v in ventas
             ]
         
-        if tipo == 'todos' or tipo == 'cotizaciones':
+        if tipo in ('todos', 'cotizaciones') and es_administrador(request.user):
             cotizaciones = Cotizacion.objects.filter(
                 Q(numero_cotizacion__icontains=query) |
                 Q(cliente__nombre__icontains=query) |
@@ -164,7 +165,7 @@ def busqueda_global(request):
         'tipo': tipo,
         'resultados': resultados,
         'historial_reciente': historial_reciente,
-        'es_admin': es_admin_bossa(request.user)
+        'es_admin': es_administrador(request.user)
     }
     
     return render(request, 'inventario/busqueda_global.html', context)
@@ -201,7 +202,7 @@ def busqueda_global_api(request):
                 })
         
         # Buscar clientes
-        if tipo == 'todos' or tipo == 'clientes':
+        if tipo in ('todos', 'clientes') and request.user.has_perm('inventario.view_cliente'):
             clientes = Cliente.objects.filter(
                 activo=True
             ).filter(
@@ -220,8 +221,8 @@ def busqueda_global_api(request):
                 })
         
         # Buscar ventas
-        if tipo == 'todos' or tipo == 'ventas':
-            ventas = Venta.objects.filter(
+        if tipo in ('todos', 'ventas') and request.user.has_perm('inventario.view_venta'):
+            ventas = ventas_visibles(request.user).filter(
                 cancelada=False,
                 numero_venta__icontains=query
             ).select_related('cliente')[:5]
@@ -251,8 +252,7 @@ def historial_busquedas(request):
     
     context = {
         'busquedas': busquedas,
-        'es_admin': es_admin_bossa(request.user)
+        'es_admin': es_administrador(request.user)
     }
     
     return render(request, 'inventario/historial_busquedas.html', context)
-

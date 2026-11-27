@@ -9,7 +9,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.utils import timezone
 from .models import Proveedor, OrdenCompra, ItemOrdenCompra, Producto, RecepcionMercancia, Almacen, StockAlmacen
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
 
 
 @login_required
@@ -51,7 +51,7 @@ def listar_ordenes_compra(request):
         'estado': estado,
         'proveedor_id': proveedor_id,
         'proveedores': proveedores,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/listar_ordenes_compra.html', context)
@@ -60,7 +60,7 @@ def listar_ordenes_compra(request):
 @login_required
 def crear_orden_compra(request):
     """Crear una nueva orden de compra"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('listar_ordenes_compra')
     
@@ -150,7 +150,7 @@ def detalle_orden_compra(request, orden_id):
         'orden': orden,
         'items': items,
         'recepciones': recepciones,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_orden_compra.html', context)
@@ -159,7 +159,7 @@ def detalle_orden_compra(request, orden_id):
 @login_required
 def recibir_mercancia(request, orden_id):
     """Recibir mercancía de una orden de compra"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('listar_ordenes_compra')
     
@@ -244,4 +244,3 @@ def recibir_mercancia(request, orden_id):
         'almacenes': almacenes,
         'es_admin': True,
     })
-

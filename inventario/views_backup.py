@@ -10,12 +10,12 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from .utils import es_admin_bossa
+from .utils import es_administrador
 
 @login_required
 def crear_backup(request):
     """Crea un backup de la base de datos desde la interfaz web"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -61,7 +61,7 @@ def crear_backup(request):
 @login_required
 def gestionar_backups(request):
     """Gestiona los backups creados"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -89,7 +89,7 @@ def gestionar_backups(request):
 @login_required
 def descargar_backup(request, nombre_archivo):
     """Descarga un archivo de backup"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -108,7 +108,7 @@ def descargar_backup(request, nombre_archivo):
 @login_required
 def eliminar_backup(request, nombre_archivo):
     """Elimina un archivo de backup"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -123,4 +123,3 @@ def eliminar_backup(request, nombre_archivo):
             messages.error(request, 'El archivo de backup no existe.')
     
     return redirect('gestionar_backups')
-

@@ -32,7 +32,7 @@ def normal_user(db):
 
 @pytest.fixture
 def bossa_user(db):
-    """Crea el usuario bossa (admin especial) para tests"""
+    """Crea una cuenta sin privilegios con el nombre histórico"""
     return User.objects.create_user(
         username='bossa',
         email='bossa@test.com',
@@ -78,4 +78,3 @@ def authenticated_api_client(api_client, admin_user):
     """Cliente API autenticado"""
     api_client.force_authenticate(user=admin_user)
     return api_client
-

@@ -9,11 +9,6 @@
         <a href="{% url 'inicio' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Volver al Inicio
         </a>
-        {% if es_admin %}
-        <a href="{% url 'crear_cuenta_cobrar' %}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Nueva Cuenta
-        </a>
-        {% endif %}
     </div>
 </div>
 
@@ -123,4 +118,3 @@
 </div>
 {% endif %}
 {% endblock %}
-

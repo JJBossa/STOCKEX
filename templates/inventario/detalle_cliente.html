@@ -13,9 +13,6 @@
         <a href="{% url 'editar_cliente' cliente.id %}" class="btn btn-outline-primary">
             <i class="bi bi-pencil"></i> Editar
         </a>
-        <a href="{% url 'crear_cuenta_cobrar_cliente' cliente.id %}" class="btn btn-outline-success">
-            <i class="bi bi-plus-circle"></i> Nueva Cuenta
-        </a>
         {% endif %}
         <a href="{% url 'listar_clientes' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Volver
@@ -169,4 +166,3 @@
     </div>
 </div>
 {% endblock %}
-

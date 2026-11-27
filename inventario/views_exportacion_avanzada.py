@@ -25,12 +25,12 @@ from .models import (
     Producto, Cliente, Venta, Cotizacion, 
     Factura, Proveedor, OrdenCompra, LogAccion
 )
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
 
 @login_required
 def exportacion_avanzada(request):
     """Vista principal para exportación avanzada"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         return redirect('inicio')
     
     context = {
@@ -41,7 +41,7 @@ def exportacion_avanzada(request):
 @login_required
 def exportar_datos_avanzado(request):
     """Exporta datos en múltiples formatos con opciones avanzadas"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     formato = request.GET.get('formato', 'excel')
@@ -264,4 +264,3 @@ def exportar_csv_avanzado(request, tipo_datos, fecha_desde, fecha_hasta, incluir
             ])
     
     return response
-

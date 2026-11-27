@@ -13,7 +13,7 @@ services:
       - ./logs:/app/logs
     environment:
       - DEBUG=True
-      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-key-change-in-production}
+      - SECRET_KEY=${SECRET_KEY:?Define una SECRET_KEY aleatoria para todos los workers}
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     command: >
       sh -c "python manage.py collectstatic --noinput &&
@@ -28,11 +28,10 @@ services:
   #   environment:
   #     - POSTGRES_DB=stockex
   #     - POSTGRES_USER=stockex
-  #     - POSTGRES_PASSWORD=stockex_password
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Define una contraseña para PostgreSQL}
   #   volumes:
   #     - postgres_data:/var/lib/postgresql/data
   #   restart: unless-stopped
 
 # volumes:
 #   postgres_data:
-

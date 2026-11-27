@@ -76,39 +76,6 @@
                 </div>
             </div>
             
-            <div class="row mb-3">
-                <div class="col-md-12">
-                    <div class="form-check">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               name="is_staff" 
-                               id="is_staff"
-                               {% if usuario.is_staff %}checked{% endif %}>
-                        <label class="form-check-label" for="is_staff">
-                            <i class="bi bi-shield"></i> Staff (acceso al panel de administración)
-                        </label>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="row mb-3">
-                <div class="col-md-12">
-                    <div class="form-check">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               name="is_superuser" 
-                               id="is_superuser"
-                               {% if usuario.is_superuser %}checked{% endif %}>
-                        <label class="form-check-label" for="is_superuser">
-                            <i class="bi bi-shield-check"></i> Superusuario (todos los permisos)
-                        </label>
-                    </div>
-                    <small class="form-text text-muted">
-                        ⚠️ Los superusuarios tienen acceso completo al sistema.
-                    </small>
-                </div>
-            </div>
-            
             <div class="alert alert-info">
                 <i class="bi bi-info-circle"></i> 
                 <strong>Nota:</strong> Para cambiar la contraseña, usa la opción "Resetear Contraseña" desde la lista de usuarios.
@@ -126,4 +93,3 @@
     </div>
 </div>
 {% endblock %}
-
