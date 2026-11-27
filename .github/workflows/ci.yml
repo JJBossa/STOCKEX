@@ -2,17 +2,26 @@ name: CI - Tests y Validación
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+
+permissions:
+  contents: read
 
 jobs:
   test:
+    name: Pruebas (${{ matrix.database }})
     runs-on: ubuntu-latest
-    
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    env:
+      DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql://postgres:postgres@127.0.0.1:5432/stockex_test' || '' }}
     services:
       postgres:
-        image: postgres:15
+        image: ${{ matrix.database == 'postgres' && 'postgres:15' || '' }}
         env:
           POSTGRES_DB: stockex_test
           POSTGRES_USER: postgres
@@ -26,70 +35,49 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y tesseract-ocr tesseract-ocr-spa libtesseract-dev poppler-utils
-    
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --only-binary=:all: --no-deps --require-hashes -r requirements-bootstrap.txt
-        python -m pip install --require-hashes -r requirements.txt
-        python -m pip check
-    
-    - name: Run migrations
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stockex_test
-      run: |
-        python manage.py migrate
-    
-    - name: Run tests with pytest
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stockex_test
-        SECRET_KEY: test-secret-key-for-ci
-      run: |
-        pytest --migrations --cov=inventario --cov-report=xml --cov-report=term
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-    
-    - name: Check Django
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stockex_test
-        SECRET_KEY: test-secret-key-for-ci
-      run: |
-        python manage.py check
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11.18'
+      - name: Instalar bibliotecas de sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 tesseract-ocr tesseract-ocr-spa poppler-utils
+      - name: Instalar dependencias bloqueadas
+        run: |
+          python -m pip install --only-binary=:all: --no-deps --require-hashes -r requirements-bootstrap.txt
+          python -m pip install --require-hashes -r requirements.txt
+          python -m pip check
+      - name: Comprobar Django y aplicar migraciones
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput --verbosity 0
+      - name: Ejecutar suite completa y cobertura
+        run: python -m pytest --cov=inventario --cov-report=term --cov-report=xml
+      - name: Guardar cobertura
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-${{ matrix.database }}
+          path: coverage.xml
+          if-no-files-found: error
 
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install linting tools
-      run: |
-        pip install flake8 black isort
-    
-    - name: Run flake8
-      run: |
-        flake8 inventario/ control_stock/ --max-line-length=120 --exclude=migrations,__pycache__
-    
-    - name: Check code formatting with black
-      run: |
-        black --check inventario/ control_stock/ --exclude=migrations
-
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11.18'
+      - name: Instalar herramientas de lint bloqueadas
+        run: |
+          python -m pip install --only-binary=:all: --no-deps --require-hashes -r requirements-bootstrap.txt
+          python -m pip install --require-hashes -r requirements-lint.txt
+          python -m pip check
+      - name: Verificar Flake8 y Black
+        run: python scripts/check_lint.py
