@@ -1,6 +1,6 @@
 # STOCKEX - Sistema de Gestión de Inventario
 
-Sistema completo de gestión de inventario desarrollado con Django 5.2.8. Permite gestionar productos, ventas, clientes, almacenes, compras y mucho más.
+Sistema de gestión de inventario desarrollado con Django 5.2 LTS. Permite gestionar productos, ventas, clientes, almacenes y compras.
 
 ## 📋 Tabla de Contenidos
 - [Características](#características)
@@ -45,23 +45,26 @@ Sistema completo de gestión de inventario desarrollado con Django 5.2.8. Permit
 
 ## Instalación
 
-1. Asegúrate de tener Python 3.8+ instalado
+1. Usa Python 3.11 en un entorno virtual.
 
 2. Instala las dependencias:
 ```bash
-pip install -r requirements.txt
+python -m pip install --only-binary=:all: --no-deps --require-hashes -r requirements-bootstrap.txt
+python -m pip install --require-hashes -r requirements.txt
+python -m pip check
 ```
+
+Consulta la [guía STK-01B](docs/seguridad/STK_01B_DEPENDENCIAS_COMPATIBILIDAD.md) para regenerar los bloqueos y configurar Codex y OCR.
 
 3. **Instala Tesseract OCR** (requerido para procesar facturas):
    - Windows: Descarga desde https://github.com/UB-Mannheim/tesseract/wiki
    - Linux: `sudo apt install tesseract-ocr tesseract-ocr-spa`
    - macOS: `brew install tesseract tesseract-lang`
    
-   Ver instrucciones detalladas en `INSTALACION_TESSERACT.md`
+   Para OCR también se requieren el idioma español, el idioma inglés y Poppler (`pdftoppm` y `pdfinfo` en el PATH).
 
 4. Realiza las migraciones:
 ```bash
-python manage.py makemigrations
 python manage.py migrate
 ```
 
@@ -209,13 +212,13 @@ SECURE_SSL_REDIRECT=True
 ## 🚀 Despliegue
 
 ### Requisitos
-- Python 3.8+
+- Python 3.11
 - PostgreSQL (producción) o SQLite (desarrollo)
 - Servidor web (Nginx/Apache) + Gunicorn
 
 ### Pasos Rápidos
 1. Configurar variables de entorno (solo producción)
-2. `pip install -r requirements.txt`
+2. Instala las dependencias siguiendo la sección de instalación.
 3. `python manage.py migrate`
 4. `python manage.py collectstatic`
 5. Iniciar con Gunicorn
@@ -224,7 +227,7 @@ Ver [Documentación Técnica](DOCUMENTACION_TECNICA.md) para detalles completos.
 
 ## 🛠️ Tecnologías Utilizadas
 
-- **Backend**: Django 5.2.8
+- **Backend**: Django 5.2 LTS
 - **Frontend**: Bootstrap 5.3.0, Bootstrap Icons
 - **Base de Datos**: SQLite (desarrollo) / PostgreSQL (producción)
 - **API**: Django REST Framework
