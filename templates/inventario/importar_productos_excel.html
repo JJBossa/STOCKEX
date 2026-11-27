@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Importar Excel - STOCKEX{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Importar Excel</h2>
+    <a href="{% url 'inicio' %}" class="btn btn-outline-secondary">Volver al catálogo</a>
+</div>
+
+{% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+{% if resumen %}
+<section class="card my-3">
+    <div class="card-body">
+        {% if importado %}
+        <h3 class="h5">Importación completada</h3>
+        {% else %}
+        <h3 class="h5">Vista previa</h3>
+        {% endif %}
+        <dl class="row">
+            <dt class="col-sm-5">Filas válidas</dt><dd class="col-sm-7">{{ resumen.validas }}</dd>
+            <dt class="col-sm-5">Productos nuevos</dt><dd class="col-sm-7">{{ resumen.nuevos }}</dd>
+            <dt class="col-sm-5">
+                {% if importado %}Productos actualizados{% else %}Productos por actualizar{% endif %}
+            </dt>
+            <dd class="col-sm-7">{{ resumen.actualizados }}</dd>
+            <dt class="col-sm-5">Productos sin cambios</dt><dd class="col-sm-7">{{ resumen.sin_cambios }}</dd>
+            <dt class="col-sm-5">Productos con precio de $1</dt><dd class="col-sm-7">{{ resumen.precio_un_peso|length }}</dd>
+            <dt class="col-sm-5">Productos sin categoría</dt><dd class="col-sm-7">{{ resumen.sin_categoria }}</dd>
+        </dl>
+        {% if resumen.precio_un_peso %}
+        <details class="alert alert-warning">
+            <summary>Revisar filas con precio de $1</summary>
+            <ul class="mb-0">
+                {% for fila in resumen.precio_un_peso %}
+                <li>Fila {{ fila.fila }} · SKU {{ fila.sku }} · {{ fila.nombre }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+        {% if resumen.errores %}
+        <h4 class="h6 text-danger">Corrige los errores para importar</h4>
+        <ul>
+            {% for error in resumen.errores %}
+            <li>Fila {{ error.fila }} · {{ error.motivo }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="card card-body">
+    {% csrf_token %}
+    {% if vista_previa %}
+    <p>Vuelve a seleccionar el mismo archivo y confirma en los próximos 15 minutos.</p>
+    <input type="hidden" name="vista_previa" value="{{ vista_previa }}">
+    {% else %}
+    <p>Usa un .xlsx o .xlsm de hasta 5 MiB con la hoja Productos y las columnas SKU, Nombre, Categoría y Precio.</p>
+    {% endif %}
+    <label for="archivo" class="form-label">Archivo Excel</label>
+    <input type="file" class="form-control mb-3" id="archivo" name="archivo" accept=".xlsx,.xlsm" required>
+    <div>
+        {% if vista_previa %}
+        <button type="submit" name="accion" value="confirmar" class="btn btn-primary">Confirmar importación</button>
+        {% endif %}
+        <button type="submit" name="accion" value="previsualizar" class="btn btn-outline-primary">Ver vista previa</button>
+    </div>
+</form>
+{% endblock %}

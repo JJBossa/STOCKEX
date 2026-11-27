@@ -207,7 +207,7 @@ python manage.py crear_usuario_normal
 ### Gestión de Datos
 ```bash
 python manage.py crear_categorias
-python manage.py importar_productos
+python manage.py importar_productos_excel catalogo.xlsx --dry-run
 python manage.py exportar_datos
 ```
 

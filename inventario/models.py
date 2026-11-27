@@ -118,9 +118,12 @@ class Producto(models.Model):
         return f"{self.nombre} - ${self.precio:,}"
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = kwargs["update_fields"] = frozenset(update_fields)
         # Guardar stock anterior para detectar cambios
         stock_anterior = None
-        if self.pk:
+        if self.pk and (update_fields is None or "stock" in update_fields):
             try:
                 stock_anterior = Producto.objects.get(pk=self.pk).stock
             except Producto.DoesNotExist:
@@ -136,7 +139,8 @@ class Producto(models.Model):
         super().save(*args, **kwargs)
         
         # Optimizar imagen después de guardar
-        self.optimizar_imagen()
+        if update_fields is None or "imagen" in update_fields:
+            self.optimizar_imagen()
         
         # Verificar si el stock bajó por debajo del mínimo y crear notificación
         if stock_anterior is not None and self.stock <= self.stock_minimo and stock_anterior > self.stock_minimo:
