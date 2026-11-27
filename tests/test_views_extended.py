@@ -120,12 +120,23 @@ class TestBusquedaGlobal:
     
     def test_busqueda_global_api_funciona(self, client, admin_user):
         """Test que la API de búsqueda global funciona correctamente"""
-        ProductoFactory(nombre='Producto Test', activo=True)
+        producto = ProductoFactory(nombre='Producto Test', activo=True)
+        ProductoFactory(nombre='Producto Test inactivo', activo=False)
         client.force_login(admin_user)
         response = client.get(reverse('busqueda_global_api'), {'q': 'Test'})
         assert response.status_code == 200
-        data = response.json()
-        assert 'productos' in data
+        assert response.json() == {
+            "resultados": [
+                {
+                    "id": producto.pk,
+                    "texto": f"{producto.nombre} ({producto.sku})",
+                    "subtitulo": f"${producto.precio:,.0f} - Stock: {producto.stock}",
+                    "tipo": "producto",
+                    "url": reverse("detalle_producto", args=[producto.pk]),
+                    "icono": "bi-box-seam",
+                }
+            ]
+        }
 
 
 @pytest.mark.django_db

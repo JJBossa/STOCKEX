@@ -28,10 +28,14 @@ class TestCliente:
         assert cliente.nombre == 'Cliente Test'
         assert cliente.activo is True
     
-    def test_cliente_str(self):
+    @pytest.mark.parametrize(
+        ("rut", "etiqueta"),
+        [(None, "Cliente Test (Sin RUT)"), ("12345678-9", "Cliente Test (12345678-9)")],
+    )
+    def test_cliente_str(self, rut, etiqueta):
         """Test el método __str__ del cliente"""
-        cliente = Cliente.objects.create(nombre='Cliente Test')
-        assert str(cliente) == 'Cliente Test'
+        cliente = Cliente.objects.create(nombre='Cliente Test', rut=rut)
+        assert str(cliente) == etiqueta
 
 
 @pytest.mark.django_db
@@ -70,7 +74,7 @@ class TestCuentaPorCobrar:
             estado='pendiente'
         )
         assert cuenta.monto_total == 100000
-        assert cuenta.monto_pendiente == 100000
+        assert cuenta.saldo_pendiente == 100000
         assert cuenta.estado == 'pendiente'
     
     def test_cuenta_por_cobrar_monto_pendiente(self, admin_user):
@@ -84,10 +88,10 @@ class TestCuentaPorCobrar:
             fecha_vencimiento=(timezone.now() + timedelta(days=30)).date(),
             estado='parcial'
         )
-        assert cuenta.monto_pendiente == 70000
+        assert cuenta.saldo_pendiente == 70000
     
     def test_cuenta_vencida(self, admin_user):
-        """Test la propiedad cuenta_vencida"""
+        """Test la propiedad esta_vencida"""
         cliente = Cliente.objects.create(nombre='Cliente Test')
         cuenta = CuentaPorCobrar.objects.create(
             cliente=cliente,
@@ -97,7 +101,7 @@ class TestCuentaPorCobrar:
             fecha_vencimiento=(timezone.now() - timedelta(days=30)).date(),
             estado='pendiente'
         )
-        assert cuenta.cuenta_vencida is True
+        assert cuenta.esta_vencida is True
 
 
 @pytest.mark.django_db
@@ -119,13 +123,17 @@ class TestCotizacion:
     
     def test_cotizacion_genera_numero_automatico(self, admin_user):
         """Test que se genera número de cotización automático"""
+        vencimiento = timezone.localdate() + timedelta(days=7)
         cotizacion = Cotizacion.objects.create(
             usuario=admin_user,
             cliente_nombre='Cliente Test',
             subtotal=100000,
-            total=100000
+            total=100000,
+            fecha_vencimiento=vencimiento,
         )
+        cotizacion.refresh_from_db()
         assert cotizacion.numero_cotizacion.startswith('COT-')
+        assert cotizacion.fecha_vencimiento == vencimiento
 
 
 @pytest.mark.django_db
