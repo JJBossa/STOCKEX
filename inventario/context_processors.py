@@ -57,3 +57,8 @@ def translations(request):
         'current_language': language,  # Para debugging
     }
 
+
+def permisos_navegacion(request):
+    from .utils import es_administrador
+
+    return {'es_administrador_nav': es_administrador(request.user)}

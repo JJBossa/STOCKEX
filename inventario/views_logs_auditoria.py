@@ -12,12 +12,12 @@ from datetime import timedelta
 import json
 import csv
 from .models import LogAccion
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
 
 @login_required
 def listar_logs(request):
     """Lista todos los logs de acciones del sistema"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -85,7 +85,7 @@ def listar_logs(request):
 @login_required
 def detalle_log(request, log_id):
     """Detalle de un log específico con comparación de datos"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         return redirect('inicio')
     
     log = LogAccion.objects.get(id=log_id)
@@ -100,7 +100,7 @@ def detalle_log(request, log_id):
 @login_required
 def exportar_logs(request):
     """Exporta logs a CSV"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     logs = LogAccion.objects.all().select_related('usuario').order_by('-fecha')[:1000]
@@ -124,4 +124,3 @@ def exportar_logs(request):
         ])
     
     return response
-

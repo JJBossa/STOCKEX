@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
 from .models import Producto, HistorialPrecio
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
 
 
 @login_required
@@ -48,7 +48,7 @@ def historial_precios_producto(request, producto_id):
         'fecha_hasta': fecha_hasta,
         'cambio_total': cambio_total,
         'porcentaje_cambio_total': porcentaje_cambio_total,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     return render(request, 'inventario/historial_precios.html', context)
 
@@ -56,7 +56,7 @@ def historial_precios_producto(request, producto_id):
 @login_required
 def historial_precios_general(request):
     """Muestra el historial de precios de todos los productos (solo admin)"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -99,4 +99,3 @@ def historial_precios_general(request):
         'es_admin': True,
     }
     return render(request, 'inventario/historial_precios_general.html', context)
-

@@ -67,7 +67,7 @@ GET /api/v1/productos/?search=producto&categoria=1&stock_bajo=true&ordering=-pre
 GET /api/v1/productos/{id}/
 ```
 
-#### Crear producto (Solo admin bossa)
+#### Crear producto (requiere permiso del modelo)
 ```http
 POST /api/v1/productos/
 Content-Type: application/json
@@ -84,13 +84,13 @@ Content-Type: application/json
 }
 ```
 
-#### Actualizar producto (Solo admin bossa)
+#### Actualizar producto (requiere permiso del modelo)
 ```http
 PUT /api/v1/productos/{id}/
 PATCH /api/v1/productos/{id}/
 ```
 
-#### Eliminar producto (Solo admin bossa)
+#### Eliminar producto (requiere permiso del modelo)
 ```http
 DELETE /api/v1/productos/{id}/
 ```
@@ -109,19 +109,21 @@ POST /api/v1/productos/{id}/actualizar_stock/
 ```http
 GET /api/v1/categorias/          # Listar
 GET /api/v1/categorias/{id}/     # Detalle
-POST /api/v1/categorias/         # Crear (solo bossa)
-PUT /api/v1/categorias/{id}/     # Actualizar (solo bossa)
-DELETE /api/v1/categorias/{id}/  # Eliminar (solo bossa)
+POST /api/v1/categorias/         # Crear (requiere permiso del modelo)
+PUT /api/v1/categorias/{id}/     # Actualizar (requiere permiso del modelo)
+DELETE /api/v1/categorias/{id}/  # Eliminar (requiere permiso del modelo)
 ```
 
 ### Ventas
+
+Solo lectura, con permiso `inventario.view_venta`. El operador solo ve sus propias ventas. El registro está suspendido.
 
 ```http
 GET /api/v1/ventas/              # Listar (solo lectura)
 GET /api/v1/ventas/{id}/         # Detalle
 ```
 
-**Nota:** Para crear ventas, usar el endpoint existente `/pos/procesar-venta/`
+**Nota:** El registro de ventas está suspendido durante STK-01A.
 
 **Filtros:**
 - `metodo_pago`: efectivo, tarjeta, transferencia, mixto
@@ -171,9 +173,9 @@ POST /api/v1/notificaciones-stock/{id}/marcar_vista/ # Marcar como vista
 ```http
 GET /api/v1/proveedores/         # Listar
 GET /api/v1/proveedores/{id}/    # Detalle
-POST /api/v1/proveedores/        # Crear (solo bossa)
-PUT /api/v1/proveedores/{id}/    # Actualizar (solo bossa)
-DELETE /api/v1/proveedores/{id}/ # Eliminar (solo bossa)
+POST /api/v1/proveedores/        # Crear (requiere permiso del modelo)
+PUT /api/v1/proveedores/{id}/    # Actualizar (requiere permiso del modelo)
+DELETE /api/v1/proveedores/{id}/ # Eliminar (requiere permiso del modelo)
 ```
 
 ## 📝 Ejemplos de Uso
@@ -230,9 +232,9 @@ curl -X GET http://localhost:8000/api/v1/productos/ \
 ## 🔒 Permisos
 
 - **Lectura (GET)**: Todos los usuarios autenticados
-- **Escritura (POST, PUT, DELETE)**: Solo usuario `bossa` (admin)
-- **Ventas**: Los usuarios solo ven sus propias ventas (excepto bossa)
-- **Cotizaciones**: Los usuarios solo ven sus propias cotizaciones (excepto bossa)
+- **Escritura de catálogo**: rol Administrador o superusuario y permiso de Django para la acción.
+- **Ventas**: el permiso de lectura habilita el historial propio. El rol Administrador y los superusuarios pueden consultar todo el historial.
+- **Cotizaciones**: se exige el permiso de modelo. El rol Administrador y los superusuarios pueden ver las cotizaciones de todos los usuarios.
 
 ## 📊 Paginación
 
@@ -257,7 +259,7 @@ Todas las listas están paginadas (20 items por página):
 
 1. **Endpoints existentes siguen funcionando**: La API REST está en paralelo, no reemplaza los endpoints actuales
 2. **Misma autenticación**: Usa el mismo sistema de usuarios de Django
-3. **Mismos permisos**: Respeta las mismas reglas de negocio (es_admin_bossa)
+3. **Permisos de Django**: Respeta la matriz de STK-01A para el catálogo y las ventas.
 4. **Compatibilidad**: Puedes usar ambos sistemas simultáneamente
 
 ## 🧪 Testing
@@ -267,4 +269,3 @@ Los endpoints de la API están cubiertos por tests. Para ejecutar:
 ```bash
 pytest tests/test_api.py -v
 ```
-

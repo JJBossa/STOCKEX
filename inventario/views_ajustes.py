@@ -9,13 +9,13 @@ from django.db.models import Q
 from django.utils import timezone
 from django.db import transaction
 from .models import Producto, AjusteInventario
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
 
 
 @login_required
 def listar_ajustes(request):
     """Lista todos los ajustes de inventario"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -67,7 +67,7 @@ def listar_ajustes(request):
 @login_required
 def crear_ajuste(request):
     """Crear un nuevo ajuste de inventario"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -119,7 +119,7 @@ def crear_ajuste(request):
 @login_required
 def detalle_ajuste(request, ajuste_id):
     """Detalle de un ajuste específico"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
         return redirect('inicio')
     
@@ -138,7 +138,7 @@ def detalle_ajuste(request, ajuste_id):
 @login_required
 def aprobar_ajuste(request, ajuste_id):
     """Aprueba un ajuste de inventario"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -162,7 +162,7 @@ def aprobar_ajuste(request, ajuste_id):
 @login_required
 def rechazar_ajuste(request, ajuste_id):
     """Rechaza un ajuste de inventario"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -183,4 +183,3 @@ def rechazar_ajuste(request, ajuste_id):
         messages.error(request, f'Error al rechazar ajuste: {str(e)}')
     
     return redirect('detalle_ajuste', ajuste_id=ajuste.id)
-

@@ -111,14 +111,6 @@ if not exist "%PROJECT_DIR%\db.sqlite3" (
     %PYTHON_CMD% manage.py migrate
 )
 
-REM Obtener la IP local para mostrar en el mensaje
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set LOCAL_IP=%%a
-    goto :ip_found
-)
-:ip_found
-set LOCAL_IP=%LOCAL_IP: =%
-
 REM Mostrar información de acceso
 echo.
 echo ============================================
@@ -127,7 +119,6 @@ echo ============================================
 echo.
 echo El sistema estara disponible en:
 echo   - Esta PC: http://localhost:8000
-echo   - Red local: http://%LOCAL_IP%:8000
 echo.
 echo Presione Ctrl+C para detener el servidor
 echo.
@@ -138,9 +129,8 @@ REM Esperar 2 segundos y abrir el navegador
 timeout /t 2 /nobreak >nul
 start http://localhost:8000
 
-REM Iniciar el servidor Django
-REM Usar 0.0.0.0 para permitir acceso desde otros dispositivos en la red local
-%PYTHON_CMD% manage.py runserver 0.0.0.0:8000
+REM Servidor de desarrollo local.
+%PYTHON_CMD% manage.py runserver 127.0.0.1:8000
 
 REM Si el servidor se cierra, mantener la ventana abierta para ver errores
 if errorlevel 1 (
@@ -149,4 +139,3 @@ if errorlevel 1 (
     echo.
     pause
 )
-

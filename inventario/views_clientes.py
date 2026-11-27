@@ -4,14 +4,16 @@ Vistas para gestión de clientes
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models.deletion import ProtectedError
 from django.db.models import Q, Sum, Count
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from .models import Cliente, Venta, CuentaPorCobrar
-from .utils import es_admin_bossa, normalizar_texto, logger
+from .utils import es_administrador, normalizar_texto, logger
+from .access import permiso_requerido
 
 
-@login_required
+@permiso_requerido('inventario.view_cliente', administrativo=True)
 def listar_clientes(request):
     """Lista todos los clientes con búsqueda y filtros"""
     clientes = Cliente.objects.all()
@@ -55,19 +57,15 @@ def listar_clientes(request):
         'tipo_cliente': tipo_cliente,
         'activo': activo,
         'orden': orden,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/listar_clientes.html', context)
 
 
-@login_required
+@permiso_requerido('inventario.add_cliente')
 def crear_cliente(request):
     """Crear un nuevo cliente"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('listar_clientes')
-    
     if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
         rut = request.POST.get('rut', '').strip() or None
@@ -105,7 +103,7 @@ def crear_cliente(request):
     })
 
 
-@login_required
+@permiso_requerido('inventario.view_cliente', administrativo=True)
 def detalle_cliente(request, cliente_id):
     """Detalle de un cliente con historial"""
     cliente = get_object_or_404(Cliente, id=cliente_id)
@@ -128,19 +126,15 @@ def detalle_cliente(request, cliente_id):
         'total_ventas': total_ventas,
         'cantidad_ventas': cantidad_ventas,
         'saldo_pendiente': saldo_pendiente,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_cliente.html', context)
 
 
-@login_required
+@permiso_requerido('inventario.change_cliente')
 def editar_cliente(request, cliente_id):
     """Editar un cliente existente"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('listar_clientes')
-    
     cliente = get_object_or_404(Cliente, id=cliente_id)
     
     if request.method == 'POST':
@@ -170,13 +164,9 @@ def editar_cliente(request, cliente_id):
     })
 
 
-@login_required
+@permiso_requerido('inventario.delete_cliente')
 def eliminar_cliente(request, cliente_id):
     """Eliminar un cliente (solo si no tiene ventas)"""
-    if not es_admin_bossa(request.user):
-        messages.error(request, 'No tienes permisos para realizar esta acción.')
-        return redirect('listar_clientes')
-    
     cliente = get_object_or_404(Cliente, id=cliente_id)
     
     if request.method == 'POST':
@@ -186,7 +176,11 @@ def eliminar_cliente(request, cliente_id):
             return redirect('detalle_cliente', cliente_id=cliente.id)
         
         nombre = cliente.nombre
-        cliente.delete()
+        try:
+            cliente.delete()
+        except ProtectedError:
+            messages.error(request, 'No se puede eliminar un cliente con cuentas por cobrar.')
+            return redirect('detalle_cliente', cliente_id=cliente.id)
         messages.success(request, f'Cliente "{nombre}" eliminado exitosamente.')
         return redirect('listar_clientes')
     
@@ -196,7 +190,7 @@ def eliminar_cliente(request, cliente_id):
     })
 
 
-@login_required
+@permiso_requerido('inventario.view_cliente')
 def buscar_cliente_api(request):
     """API para buscar clientes (autocompletado)"""
     query = request.GET.get('q', '').strip()
@@ -223,4 +217,3 @@ def buscar_cliente_api(request):
     except Exception as e:
         logger.error(f'Error en búsqueda de clientes: {str(e)}')
         return JsonResponse({'clientes': [], 'error': str(e)})
-

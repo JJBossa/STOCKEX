@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 
-{% block title %}Eliminar Usuario - STOCKEX{% endblock %}
+{% block title %}Desactivar Usuario - STOCKEX{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-trash"></i> Eliminar Usuario</h2>
+    <h2><i class="bi bi-trash"></i> Desactivar Usuario</h2>
     <div class="d-flex gap-2">
         <a href="{% url 'inicio' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Volver al Inicio
@@ -19,9 +19,9 @@
     <div class="card-body">
         <div class="alert alert-danger">
             <i class="bi bi-exclamation-triangle"></i> 
-            <strong>¡Advertencia!</strong> Estás a punto de eliminar permanentemente el usuario <strong>{{ usuario.username }}</strong>.
+            <strong>¡Advertencia!</strong> Estás a punto de desactivar al usuario <strong>{{ usuario.username }}</strong>.
             <br><br>
-            Esta acción <strong>NO se puede deshacer</strong>. Todos los datos asociados a este usuario se perderán.
+            El usuario perderá el acceso y su historial se conservará.
         </div>
         
         <div class="card mb-3">
@@ -58,11 +58,10 @@
                     <i class="bi bi-x-circle"></i> Cancelar
                 </a>
                 <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-trash"></i> Eliminar Usuario Permanentemente
+                    <i class="bi bi-trash"></i> Desactivar Usuario
                 </button>
             </div>
         </form>
     </div>
 </div>
 {% endblock %}
-

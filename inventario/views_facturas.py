@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from .models import Factura, ItemFactura, Proveedor, Producto, HistorialCambio, Categoria
 from .forms_facturas import FacturaForm, ItemFacturaForm, ProveedorForm
 from .utils_ocr import extraer_texto_ocr, extraer_items_factura
-from .utils import es_admin_bossa, registrar_cambio
+from .utils import es_administrador, registrar_cambio
 from django.conf import settings
 
 @login_required
@@ -36,7 +36,7 @@ def listar_facturas(request):
         'proveedores': proveedores,
         'estado_filtro': estado,
         'proveedor_filtro': proveedor_id,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/listar_facturas.html', context)
@@ -44,7 +44,7 @@ def listar_facturas(request):
 @login_required
 def subir_factura(request):
     """Vista para subir una nueva factura"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
 
@@ -173,7 +173,7 @@ def subir_factura(request):
 @login_required
 def editar_factura(request, factura_id):
     """Vista para editar y confirmar items de una factura"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -335,7 +335,7 @@ def detalle_factura(request, factura_id):
     context = {
         'factura': factura,
         'items': items,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_factura.html', context)
@@ -343,7 +343,7 @@ def detalle_factura(request, factura_id):
 @login_required
 def eliminar_factura(request, factura_id):
     """Elimina una factura"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -373,7 +373,7 @@ def eliminar_factura(request, factura_id):
 @login_required
 def gestionar_proveedores(request):
     """Gestionar proveedores"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     

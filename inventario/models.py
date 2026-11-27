@@ -585,7 +585,7 @@ class CuentaPorCobrar(models.Model):
         ('cancelado', 'Cancelado'),
     ]
     
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='cuentas_por_cobrar', verbose_name="Cliente")
+    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='cuentas_por_cobrar', verbose_name="Cliente")
     venta = models.ForeignKey(Venta, on_delete=models.SET_NULL, null=True, blank=True, related_name='cuenta_por_cobrar', verbose_name="Venta Relacionada")
     numero_documento = models.CharField(max_length=50, unique=True, verbose_name="Número de Documento")
     monto_total = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="Monto Total")

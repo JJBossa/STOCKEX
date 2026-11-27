@@ -15,13 +15,14 @@ import io
 import os
 import pytz
 from .models import Producto, Categoria, Venta, ItemVenta, LogAccion
-from .utils import es_admin_bossa, logger
+from .access import permiso_requerido, ventas_visibles
+from .utils import es_administrador, logger
 from django.contrib import messages
 
 @login_required
 def imprimir_etiquetas(request):
     """Vista para seleccionar productos e imprimir etiquetas"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         from django.contrib import messages
         from django.shortcuts import redirect
         messages.error(request, 'No tienes permisos para acceder a esta sección.')
@@ -56,7 +57,7 @@ def imprimir_etiquetas(request):
 @login_required
 def generar_etiquetas_pdf(request):
     """Genera PDF con etiquetas de productos"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         return HttpResponse('No autorizado', status=403)
     
     producto_ids = request.GET.getlist('producto_id')
@@ -185,7 +186,7 @@ def imprimir_lista_precios(request):
         'categoria_id': categoria_id,
         'incluir_precio_compra': incluir_precio_compra,
         'solo_con_stock': solo_con_stock,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/imprimir_lista_precios.html', context)
@@ -196,7 +197,7 @@ def generar_lista_precios_pdf(request):
     categoria_id = request.GET.get('categoria', '')
     incluir_precio_compra = request.GET.get('precio_compra', '') == '1'
     solo_con_stock = request.GET.get('solo_stock', '') == '1'
-    es_admin = es_admin_bossa(request.user)
+    es_admin = es_administrador(request.user)
     
     productos = Producto.objects.filter(activo=True).order_by('nombre')
     
@@ -273,7 +274,7 @@ def generar_lista_precios_pdf(request):
     response['Content-Disposition'] = 'attachment; filename="lista_precios.pdf"'
     return response
 
-@login_required
+@permiso_requerido('inventario.view_venta')
 def imprimir_ticket_venta(request, venta_id):
     """Genera ticket de venta - por defecto térmica 58mm, o A4 si se especifica tipo=a4"""
     tipo = request.GET.get('tipo', 'termica')  # 'termica' o 'a4'
@@ -283,15 +284,10 @@ def imprimir_ticket_venta(request, venta_id):
     else:
         return imprimir_ticket_venta_termica(request, venta_id)
 
-@login_required
+@permiso_requerido('inventario.view_venta')
 def imprimir_ticket_venta_termica(request, venta_id):
     """Genera ticket de venta para impresión térmica 58mm"""
-    venta = get_object_or_404(Venta, id=venta_id)
-    
-    # Permitir acceso al usuario que hizo la venta o al admin
-    if not es_admin_bossa(request.user) and venta.usuario != request.user:
-        messages.error(request, 'No tienes permisos para ver este ticket.')
-        return redirect('listar_ventas')
+    venta = get_object_or_404(ventas_visibles(request.user), id=venta_id)
     
     items = venta.items.all()
     
@@ -433,15 +429,10 @@ def imprimir_ticket_venta_termica(request, venta_id):
     response['Content-Disposition'] = f'inline; filename="ticket_termico_{venta.numero_venta}.pdf"'
     return response
 
-@login_required
+@permiso_requerido('inventario.view_venta')
 def imprimir_ticket_venta_a4(request, venta_id):
     """Genera ticket de venta en formato A4 con formato similar a cotizaciones"""
-    venta = get_object_or_404(Venta, id=venta_id)
-    
-    # Permitir acceso al usuario que hizo la venta o al admin
-    if not es_admin_bossa(request.user) and venta.usuario != request.user:
-        messages.error(request, 'No tienes permisos para ver este ticket.')
-        return redirect('listar_ventas')
+    venta = get_object_or_404(ventas_visibles(request.user), id=venta_id)
     
     items = venta.items.all()
     
@@ -594,4 +585,3 @@ def imprimir_ticket_venta_a4(request, venta_id):
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="ticket_a4_{venta.numero_venta}.pdf"'
     return response
-

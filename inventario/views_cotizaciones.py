@@ -1,11 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum, Count
 from django.core.paginator import Paginator
 from django.utils import timezone
-from django.db import transaction
 from datetime import timedelta
 from decimal import Decimal
 from reportlab.lib.pagesizes import A4
@@ -14,10 +12,11 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 import io
-from .models import Producto, Cotizacion, ItemCotizacion, Venta, ItemVenta, MovimientoStock, Cliente
-from .utils import es_admin_bossa, registrar_cambio
+from .models import Producto, Cotizacion, ItemCotizacion, Cliente
+from .utils import es_administrador, registrar_cambio
+from .access import operaciones_financieras_suspendidas, permiso_requerido
 
-@login_required
+@permiso_requerido('inventario.add_cotizacion')
 def crear_cotizacion(request):
     """Vista para crear una nueva cotización"""
     productos = Producto.objects.filter(activo=True).order_by('nombre')
@@ -113,15 +112,15 @@ def crear_cotizacion(request):
     context = {
         'productos': productos,
         'fecha_vencimiento_default': fecha_vencimiento_default,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/crear_cotizacion.html', context)
 
-@login_required
+@permiso_requerido('inventario.view_cotizacion')
 def listar_cotizaciones(request):
     """Lista todas las cotizaciones - Usuarios normales solo ven las suyas"""
-    if es_admin_bossa(request.user):
+    if es_administrador(request.user):
         cotizaciones = Cotizacion.objects.select_related('usuario').prefetch_related('items').all()
     else:
         cotizaciones = Cotizacion.objects.select_related('usuario').prefetch_related('items').filter(usuario=request.user)
@@ -162,15 +161,15 @@ def listar_cotizaciones(request):
         'cliente': cliente,
         'total_cotizaciones': total_cotizaciones,
         'total_cotizaciones_count': total_cotizaciones_count,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/listar_cotizaciones.html', context)
 
-@login_required
+@permiso_requerido('inventario.view_cotizacion')
 def detalle_cotizacion(request, cotizacion_id):
     """Detalle de una cotización"""
-    if es_admin_bossa(request.user):
+    if es_administrador(request.user):
         cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id)
     else:
         cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id, usuario=request.user)
@@ -180,12 +179,12 @@ def detalle_cotizacion(request, cotizacion_id):
     context = {
         'cotizacion': cotizacion,
         'items': items,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_cotizacion.html', context)
 
-@login_required
+@permiso_requerido('inventario.view_cotizacion')
 def imprimir_cotizacion(request, cotizacion_id):
     """Genera PDF de cotización - por defecto térmica 58mm, o A4 si se especifica tipo=a4"""
     tipo = request.GET.get('tipo', 'termica')  # 'termica' o 'a4'
@@ -195,10 +194,10 @@ def imprimir_cotizacion(request, cotizacion_id):
     else:
         return imprimir_cotizacion_termica(request, cotizacion_id)
 
-@login_required
+@permiso_requerido('inventario.view_cotizacion')
 def imprimir_cotizacion_termica(request, cotizacion_id):
     """Genera PDF de cotización para impresión térmica 58mm"""
-    if es_admin_bossa(request.user):
+    if es_administrador(request.user):
         cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id)
     else:
         cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id, usuario=request.user)
@@ -397,10 +396,10 @@ def imprimir_cotizacion_termica(request, cotizacion_id):
     response['Content-Disposition'] = f'inline; filename="cotizacion_termica_{cotizacion.numero_cotizacion}.pdf"'
     return response
 
-@login_required
+@permiso_requerido('inventario.view_cotizacion')
 def imprimir_cotizacion_a4(request, cotizacion_id):
     """Genera PDF de cotización en formato A4"""
-    if es_admin_bossa(request.user):
+    if es_administrador(request.user):
         cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id)
     else:
         cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id, usuario=request.user)
@@ -573,79 +572,6 @@ def imprimir_cotizacion_a4(request, cotizacion_id):
     response['Content-Disposition'] = f'inline; filename="cotizacion_a4_{cotizacion.numero_cotizacion}.pdf"'
     return response
 
-@login_required
-@transaction.atomic
+@permiso_requerido('inventario.view_venta')
 def convertir_cotizacion_en_venta(request, cotizacion_id):
-    """Convierte una cotización en una venta"""
-    if es_admin_bossa(request.user):
-        cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id)
-    else:
-        cotizacion = get_object_or_404(Cotizacion, id=cotizacion_id, usuario=request.user)
-    
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
-    
-    if cotizacion.convertida_en_venta:
-        return JsonResponse({'error': 'Esta cotización ya fue convertida en venta'}, status=400)
-    
-    try:
-        # Crear venta
-        venta = Venta.objects.create(
-            usuario=request.user,
-            subtotal=cotizacion.subtotal,
-            descuento=cotizacion.descuento,
-            total=cotizacion.total,
-            metodo_pago='efectivo',  # Por defecto, se puede cambiar después
-            notas=f'Convertida desde cotización {cotizacion.numero_cotizacion}'
-        )
-        
-        # Crear items de venta y descontar stock
-        for item_cot in cotizacion.items.all():
-            if item_cot.producto:
-                # Verificar stock
-                if item_cot.producto.stock < item_cot.cantidad:
-                    venta.delete()
-                    return JsonResponse({
-                        'error': f'Stock insuficiente para {item_cot.nombre_producto}. Disponible: {item_cot.producto.stock}'
-                    }, status=400)
-                
-                stock_anterior = item_cot.producto.stock
-                item_cot.producto.stock -= item_cot.cantidad
-                item_cot.producto.save()
-                
-                ItemVenta.objects.create(
-                    venta=venta,
-                    producto=item_cot.producto,
-                    nombre_producto=item_cot.nombre_producto,
-                    cantidad=item_cot.cantidad,
-                    precio_unitario=item_cot.precio_unitario,
-                    stock_anterior=stock_anterior,
-                    stock_despues=item_cot.producto.stock
-                )
-            else:
-                # Producto eliminado, crear item sin producto
-                ItemVenta.objects.create(
-                    venta=venta,
-                    producto=None,
-                    nombre_producto=item_cot.nombre_producto,
-                    cantidad=item_cot.cantidad,
-                    precio_unitario=item_cot.precio_unitario,
-                    stock_anterior=0,
-                    stock_despues=0
-                )
-        
-        # Marcar cotización como aprobada y vinculada
-        cotizacion.estado = 'aprobada'
-        cotizacion.convertida_en_venta = venta
-        cotizacion.save()
-        
-        return JsonResponse({
-            'success': True,
-            'venta_id': venta.id,
-            'numero_venta': venta.numero_venta,
-            'mensaje': f'Cotización convertida en venta #{venta.numero_venta}'
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': f'Error al convertir cotización: {str(e)}'}, status=500)
-
+    return operaciones_financieras_suspendidas()

@@ -123,13 +123,15 @@ Todos los endpoints soportan:
 - `X_FRAME_OPTIONS = 'DENY'` - Previene clickjacking
 
 ### Permisos
-- **Administrador (bossa)**: Acceso completo
-- **Usuarios normales**: Acceso limitado a funciones básicas
+- **Administrador**: Gestión de catálogo, cuentas de operadores y consulta financiera.
+- **Vendedor**: Consulta del catálogo e historial propio.
+- **Superusuario**: Administración de roles y permisos de Django.
+- Las escrituras financieras permanecen suspendidas. Consulta la [matriz de seguridad](docs/seguridad/STK_01A_SEGURIDAD_USUARIOS_PERMISOS.md).
 - **API**: Requiere autenticación (JWT o Session)
 
 ### Variables de Entorno Recomendadas
 ```bash
-SECRET_KEY=tu-clave-secreta-muy-larga-y-aleatoria
+# Inyecta SECRET_KEY desde el gestor de secretos del entorno.
 DEBUG=False
 ALLOWED_HOSTS=tu-dominio.com,www.tu-dominio.com
 SECURE_HSTS_SECONDS=31536000
@@ -295,4 +297,3 @@ python manage.py collectstatic
 ## Licencia
 
 Este proyecto es de uso privado. Todos los derechos reservados.
-

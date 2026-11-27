@@ -4,13 +4,13 @@ from django.contrib import messages
 from django.http import JsonResponse
 from .models import Categoria, Producto
 from .forms import CategoriaForm
-from .utils import es_admin_bossa, logger, invalidar_cache_categorias
+from .utils import es_administrador, logger, invalidar_cache_categorias
 
 
 @login_required
 def gestionar_categorias(request):
     """Vista para listar, agregar y editar categorías (solo admin)"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para realizar esta acción.')
         return redirect('inicio')
     
@@ -64,7 +64,7 @@ def gestionar_categorias(request):
 @login_required
 def editar_categoria_ajax(request, categoria_id):
     """Obtener datos de una categoría para edición via AJAX"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         return JsonResponse({'error': 'Sin permisos'}, status=403)
     
     categoria = get_object_or_404(Categoria, id=categoria_id)
@@ -78,4 +78,3 @@ def editar_categoria_ajax(request, categoria_id):
 
 # Importar models para Count
 from django.db import models
-

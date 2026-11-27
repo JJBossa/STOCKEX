@@ -108,7 +108,10 @@ class CotizacionSerializer(serializers.ModelSerializer):
             'fecha_creacion', 'fecha_vencimiento', 'subtotal', 'descuento', 'total',
             'estado', 'notas', 'convertida_en_venta', 'items', 'esta_vencida'
         ]
-        read_only_fields = ['numero_cotizacion', 'fecha_creacion', 'subtotal', 'total']
+        read_only_fields = [
+            'numero_cotizacion', 'fecha_creacion', 'subtotal', 'total',
+            'usuario', 'convertida_en_venta',
+        ]
 
 
 class ProveedorSerializer(serializers.ModelSerializer):

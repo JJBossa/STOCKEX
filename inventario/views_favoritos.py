@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from .models import Producto, ProductoFavorito
-from .utils import es_admin_bossa
+from .utils import es_administrador
 
 @login_required
 @require_POST
@@ -54,8 +54,7 @@ def mis_favoritos(request):
     context = {
         'productos': productos_favoritos,
         'total_favoritos': len(productos_favoritos),
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/mis_favoritos.html', context)
-

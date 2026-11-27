@@ -8,21 +8,28 @@ from django.db.models import Q, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from .models import NotificacionUsuario, CuentaPorCobrar, OrdenCompra, Producto
-from .utils import es_admin_bossa, logger
+from .utils import es_administrador, logger
+
+
+def notificaciones_visibles(usuario):
+    notificaciones = NotificacionUsuario.objects.filter(usuario=usuario)
+    if not usuario.has_perm('inventario.view_cuentaporcobrar'):
+        notificaciones = notificaciones.exclude(tipo='cuenta_vencida')
+    if not es_administrador(usuario):
+        notificaciones = notificaciones.exclude(tipo='orden_pendiente')
+    return notificaciones
+
 
 @login_required
 def centro_notificaciones(request):
     """Centro de notificaciones del usuario"""
-    notificaciones = NotificacionUsuario.objects.filter(
-        usuario=request.user
-    ).order_by('-fecha', 'leida')[:50]
-    
+    notificaciones = notificaciones_visibles(request.user)
     no_leidas = notificaciones.filter(leida=False).count()
     
     context = {
-        'notificaciones': notificaciones,
+        'notificaciones': notificaciones.order_by('-fecha', 'leida')[:50],
         'no_leidas': no_leidas,
-        'es_admin': es_admin_bossa(request.user)
+        'es_admin': es_administrador(request.user)
     }
     
     return render(request, 'inventario/centro_notificaciones.html', context)
@@ -54,10 +61,7 @@ def marcar_todas_leidas(request):
 @login_required
 def obtener_notificaciones_api(request):
     """API para obtener notificaciones no leídas (para polling)"""
-    notificaciones = NotificacionUsuario.objects.filter(
-        usuario=request.user,
-        leida=False
-    ).order_by('-fecha')[:10]
+    notificaciones = notificaciones_visibles(request.user).filter(leida=False)
     
     datos = [
         {
@@ -68,7 +72,7 @@ def obtener_notificaciones_api(request):
             'fecha': n.fecha.isoformat(),
             'url': n.url_relacionada or ''
         }
-        for n in notificaciones
+        for n in notificaciones.order_by('-fecha')[:10]
     ]
     
     return JsonResponse({
@@ -79,6 +83,11 @@ def obtener_notificaciones_api(request):
 def crear_notificaciones_automaticas():
     """Crea notificaciones automáticas para eventos del sistema"""
     from django.contrib.auth.models import User
+
+    admins = User.objects.filter(is_active=True).filter(
+        Q(is_superuser=True) | Q(groups__name='Administrador')
+    ).distinct()
+    admins_cuentas = [u for u in admins if u.has_perm('inventario.view_cuentaporcobrar')]
     
     # Notificaciones de cuentas por cobrar vencidas
     cuentas_vencidas = CuentaPorCobrar.objects.filter(
@@ -88,9 +97,7 @@ def crear_notificaciones_automaticas():
     
     for cuenta in cuentas_vencidas:
         if cuenta.cliente:
-            # Buscar usuarios admin para notificar
-            admins = User.objects.filter(username='bossa')
-            for admin in admins:
+            for admin in admins_cuentas:
                 NotificacionUsuario.objects.get_or_create(
                     usuario=admin,
                     tipo='cuenta_vencida',
@@ -111,7 +118,6 @@ def crear_notificaciones_automaticas():
     )
     
     for producto in productos_bajo_stock:
-        admins = User.objects.filter(username='bossa')
         for admin in admins:
             NotificacionUsuario.objects.get_or_create(
                 usuario=admin,
@@ -131,7 +137,6 @@ def crear_notificaciones_automaticas():
     )
     
     for orden in ordenes_pendientes:
-        admins = User.objects.filter(username='bossa')
         for admin in admins:
             NotificacionUsuario.objects.get_or_create(
                 usuario=admin,
@@ -144,4 +149,3 @@ def crear_notificaciones_automaticas():
                     'datos_adicionales': {'orden_id': orden.id}
                 }
             )
-

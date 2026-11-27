@@ -26,16 +26,6 @@
                 <i class="bi bi-file-pdf"></i> A4
             </a>
         </div>
-        {% if es_admin or venta.usuario == request.user %}
-        <button class="btn btn-danger me-2" onclick="cancelarVenta({{ venta.id }}, '{{ venta.numero_venta }}')">
-            <i class="bi bi-x-circle"></i> Cancelar Venta
-        </button>
-        {% endif %}
-        {% endif %}
-        {% if es_admin and not venta.cancelada %}
-        <a href="{% url 'crear_devolucion_venta' venta.id %}" class="btn btn-danger me-2">
-            <i class="bi bi-arrow-counterclockwise"></i> Crear Devolución
-        </a>
         {% endif %}
         <a href="{% url 'listar_ventas' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Volver
@@ -161,53 +151,8 @@
     </div>
 </div>
 
-<script>
-function cancelarVenta(ventaId, numeroVenta) {
-    if (!confirm(`¿Estás seguro de cancelar la venta ${numeroVenta}? Se restaurará el stock de los productos.`)) {
-        return;
-    }
-    
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    
-    const csrftoken = getCookie('csrftoken');
-    
-    fetch(`/ventas/${ventaId}/cancelar/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrftoken,
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.mensaje);
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'No se pudo cancelar la venta'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error al cancelar la venta');
-    });
-}
-</script>
 {% endblock %}
 
 {% block ayuda %}
 {% include 'inventario/ayuda_contextual.html' %}
 {% endblock %}
-

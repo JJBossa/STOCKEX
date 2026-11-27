@@ -25,11 +25,6 @@
                 <i class="bi bi-file-pdf"></i> A4
             </a>
         </div>
-        {% if cotizacion.estado == 'pendiente' and not cotizacion.convertida_en_venta %}
-        <button class="btn btn-success me-2" onclick="convertirEnVenta({{ cotizacion.id }}, '{{ cotizacion.numero_cotizacion }}')">
-            <i class="bi bi-cash-register"></i> Convertir en Venta
-        </button>
-        {% endif %}
         <a href="{% url 'listar_cotizaciones' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>
@@ -193,53 +188,8 @@
     </div>
 </div>
 
-<script>
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-function convertirEnVenta(cotizacionId, numeroCotizacion) {
-    if (!confirm(`¿Convertir la cotización ${numeroCotizacion} en una venta?\n\nSe descontará el stock de los productos.`)) {
-        return;
-    }
-    
-    const csrftoken = getCookie('csrftoken');
-    
-    fetch(`/cotizaciones/${cotizacionId}/convertir/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrftoken,
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.mensaje);
-            window.location.href = `/ventas/${data.venta_id}/`;
-        } else {
-            alert('Error: ' + (data.error || 'No se pudo convertir la cotización'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error al convertir la cotización');
-    });
-}
-</script>
 {% endblock %}
 
 {% block ayuda %}
 {% include 'inventario/ayuda_contextual.html' %}
 {% endblock %}
-

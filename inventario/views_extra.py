@@ -19,12 +19,12 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from .models import Producto, Categoria, HistorialCambio
 from .forms import ProductoForm, CategoriaForm
-from .utils import es_admin_bossa, registrar_cambio, logger
+from .utils import es_administrador, registrar_cambio, logger
 
 @login_required
 def dashboard(request):
     """Dashboard con estadísticas para el admin"""
-    if not es_admin_bossa(request.user):
+    if not es_administrador(request.user):
         messages.error(request, 'No tienes permisos para acceder al dashboard.')
         return redirect('inicio')
     
@@ -113,7 +113,7 @@ def detalle_producto(request, producto_id):
     context = {
         'producto': producto,
         'historial': historial,
-        'es_admin': es_admin_bossa(request.user),
+        'es_admin': es_administrador(request.user),
     }
     
     return render(request, 'inventario/detalle_producto.html', context)
@@ -248,4 +248,3 @@ def exportar_csv(request):
         ])
     
     return response
-

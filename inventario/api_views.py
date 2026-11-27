@@ -5,14 +5,13 @@ Estos endpoints están en paralelo con los existentes, NO los reemplazan
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.db.models import Q, F
+from django.db.models import F
 from django_filters.rest_framework import DjangoFilterBackend
 from typing import Optional
 
 from .models import (
-    Producto, Categoria, Venta, ItemVenta,
-    Cotizacion, ItemCotizacion, MovimientoStock,
+    Producto, Categoria, Venta,
+    Cotizacion, MovimientoStock,
     NotificacionStock, Proveedor
 )
 from .serializers import (
@@ -20,20 +19,23 @@ from .serializers import (
     VentaSerializer, CotizacionSerializer, MovimientoStockSerializer,
     NotificacionStockSerializer, ProveedorSerializer
 )
-from .utils import es_admin_bossa, normalizar_texto
-from .permissions import IsAdminOrReadOnly, IsOwnerOrAdmin, IsAdminBossa
+from .access import ventas_visibles
+from .permissions import PermisosCatalogo, PermisosModelo, PermisoAccionAdministrativa
+from .utils import es_administrador
 
 
 class ProductoViewSet(viewsets.ModelViewSet):
+    permiso_accion = 'inventario.change_producto'
+
     """
     ViewSet para gestionar productos
     
     Permite:
     - list: Listar productos (GET /api/v1/productos/)
     - retrieve: Obtener un producto (GET /api/v1/productos/{id}/)
-    - create: Crear producto (POST /api/v1/productos/) - Solo admin bossa
-    - update: Actualizar producto (PUT /api/v1/productos/{id}/) - Solo admin bossa
-    - destroy: Eliminar producto (DELETE /api/v1/productos/{id}/) - Solo admin bossa
+    - create: Crear producto (POST /api/v1/productos/)
+    - update: Actualizar producto (PUT /api/v1/productos/{id}/)
+    - destroy: Eliminar producto (DELETE /api/v1/productos/{id}/)
     
     Filtros:
     - ?search=nombre - Búsqueda en nombre y SKU
@@ -42,7 +44,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
     - ?activo=true - Solo productos activos
     """
     queryset = Producto.objects.all().select_related('categoria')
-    permission_classes = [IsAdminOrReadOnly]  # Usar permiso personalizado
+    permission_classes = [PermisosCatalogo]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['categoria', 'activo']
     search_fields = ['nombre', 'sku', 'descripcion']
@@ -71,7 +73,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         
         return queryset
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminBossa])
+    @action(detail=True, methods=['post'], permission_classes=[PermisoAccionAdministrativa])
     def actualizar_stock(self, request, pk: Optional[int] = None) -> Response:
         """
         Endpoint para actualizar stock de un producto.
@@ -117,7 +119,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     """ViewSet para gestionar categorías"""
     queryset = Categoria.objects.all()
     serializer_class = CategoriaSerializer
-    permission_classes = [IsAdminOrReadOnly]  # Usar permiso personalizado
+    permission_classes = [PermisosCatalogo]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre', 'descripcion']
     ordering_fields = ['nombre', 'fecha_creacion']
@@ -127,36 +129,26 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 class VentaViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet para consultar ventas (solo lectura)
-    Para crear ventas, usar el endpoint existente /pos/procesar-venta/
+    El registro de ventas está suspendido.
     """
     queryset = Venta.objects.all().select_related('usuario').prefetch_related('items')
     serializer_class = VentaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PermisosModelo]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['metodo_pago', 'cancelada', 'usuario']
     ordering_fields = ['fecha', 'total']
     ordering = ['-fecha']
     
     def get_queryset(self):
-        """Filtrar ventas según usuario"""
-        queryset = super().get_queryset()
-        
-        # Si no es admin, solo ver sus propias ventas
-        if not es_admin_bossa(self.request.user):
-            queryset = queryset.filter(usuario=self.request.user)
-        
-        return queryset
-    
-    def get_permissions(self):
-        """Usar permiso personalizado para objetos"""
-        return [IsAuthenticated(), IsOwnerOrAdmin()]
+        return ventas_visibles(self.request.user).select_related('usuario').prefetch_related('items')
+
 
 
 class CotizacionViewSet(viewsets.ModelViewSet):
     """ViewSet para gestionar cotizaciones"""
     queryset = Cotizacion.objects.all().select_related('usuario').prefetch_related('items')
     serializer_class = CotizacionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PermisosModelo]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['estado', 'usuario']
     ordering_fields = ['fecha_creacion', 'total']
@@ -167,16 +159,10 @@ class CotizacionViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         
         # Si no es admin, solo ver sus propias cotizaciones
-        if not es_admin_bossa(self.request.user):
+        if not es_administrador(self.request.user):
             queryset = queryset.filter(usuario=self.request.user)
         
         return queryset
-    
-    def get_permissions(self):
-        """Permisos: todos pueden crear, solo owner/admin puede editar/eliminar"""
-        if self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAuthenticated(), IsOwnerOrAdmin()]
-        return [IsAuthenticated()]
     
     def perform_create(self, serializer):
         """Asignar usuario actual al crear cotización"""
@@ -187,7 +173,7 @@ class MovimientoStockViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet para consultar movimientos de stock (solo lectura)"""
     queryset = MovimientoStock.objects.all().select_related('producto', 'usuario')
     serializer_class = MovimientoStockSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PermisosModelo]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['tipo', 'motivo', 'producto']
     ordering_fields = ['fecha']
@@ -198,13 +184,15 @@ class NotificacionStockViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet para consultar notificaciones de stock bajo"""
     queryset = NotificacionStock.objects.all().select_related('producto')
     serializer_class = NotificacionStockSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PermisosModelo]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['vista', 'notificada']
     ordering_fields = ['fecha']
     ordering = ['-fecha']
     
-    @action(detail=True, methods=['post'])
+    permiso_accion = 'inventario.change_notificacionstock'
+
+    @action(detail=True, methods=['post'], permission_classes=[PermisoAccionAdministrativa])
     def marcar_vista(self, request, pk: Optional[int] = None) -> Response:
         """Marcar notificación como vista"""
         notificacion = self.get_object()
@@ -217,9 +205,8 @@ class ProveedorViewSet(viewsets.ModelViewSet):
     """ViewSet para gestionar proveedores"""
     queryset = Proveedor.objects.all()
     serializer_class = ProveedorSerializer
-    permission_classes = [IsAdminOrReadOnly]  # Usar permiso personalizado
+    permission_classes = [PermisosCatalogo]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre', 'rut', 'email']
     ordering_fields = ['nombre', 'fecha_creacion']
     ordering = ['nombre']
-

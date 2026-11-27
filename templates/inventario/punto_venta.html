@@ -111,6 +111,7 @@
 {% endblock %}
 
 {% block content %}
+<div class="alert alert-warning" role="status">El registro de ventas está suspendido. Puedes consultar el catálogo y el historial.</div>
 <div class="pos-container" style="margin-top: -10px;">
     <!-- Sección de productos y escaneo -->
     <div class="productos-section">
@@ -124,7 +125,7 @@
                        placeholder="Escanea o escribe el código..."
                        autofocus>
                 <small class="text-muted" style="font-size: 0.75rem;">
-                    <i class="bi bi-keyboard"></i> <kbd>F1</kbd> Nueva | <kbd>F2</kbd> Procesar | <kbd>F3</kbd> Enfocar
+                    <i class="bi bi-keyboard"></i> <kbd>F1</kbd> Nueva | <kbd>F3</kbd> Enfocar
                 </small>
             </div>
         </div>
@@ -268,14 +269,6 @@
             </div>
             
             <div class="d-grid gap-2" style="position: relative; z-index: 10;">
-                <button class="btn btn-success" 
-                        onclick="procesarVenta()" 
-                        data-bs-toggle="tooltip" 
-                        data-bs-placement="top" 
-                        title="Finaliza la venta y actualiza el stock automáticamente"
-                        style="position: relative; z-index: 10; pointer-events: auto; padding: 10px; font-size: 1rem; font-weight: 600;">
-                    <i class="bi bi-check-circle"></i> Procesar
-                </button>
                 <button type="button" 
                         class="btn btn-outline-danger" 
                         onclick="limpiarCarrito()" 
@@ -649,98 +642,6 @@ document.getElementById('metodo-pago').addEventListener('change', function() {
     }
 });
 
-// Procesar venta
-function procesarVenta() {
-    if (carrito.length === 0) {
-        alert('El carrito está vacío');
-        return;
-    }
-    
-    // Asegurar que el total esté actualizado
-    calcularTotal();
-    
-    const subtotal = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    const valorDescuento = parseFloat(document.getElementById('descuento').value) || 0;
-    const tipoDescuento = document.querySelector('input[name="tipo-descuento"]:checked').value;
-    
-    let descuento = 0;
-    if (tipoDescuento === 'porcentaje') {
-        descuento = (subtotal * valorDescuento) / 100;
-    } else {
-        descuento = valorDescuento;
-    }
-    descuento = Math.min(descuento, subtotal);
-    
-    const total = totalActual; // Usar la variable global
-    const metodoPago = document.getElementById('metodo-pago').value;
-    const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
-    const cambio = Math.max(0, montoRecibido - total);
-    
-    if (total <= 0) {
-        alert('El total debe ser mayor a 0');
-        return;
-    }
-    
-    if ((metodoPago === 'efectivo' || metodoPago === 'mixto') && montoRecibido < total) {
-        alert('El monto recibido debe ser mayor o igual al total');
-        return;
-    }
-    
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    
-    const csrftoken = getCookie('csrftoken');
-    const formData = new FormData();
-    formData.append('items', JSON.stringify(carrito));
-    formData.append('subtotal', subtotal);
-    formData.append('descuento', descuento);
-    formData.append('total', total);
-    formData.append('metodo_pago', metodoPago);
-    formData.append('monto_recibido', montoRecibido);
-    formData.append('cambio', cambio);
-    
-    fetch('/pos/procesar-venta/', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrftoken,
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('numero-venta-modal').textContent = data.numero_venta;
-            document.getElementById('total-modal').textContent = `$${data.total.toLocaleString()}`;
-            // Guardar el ID de la venta en el modal para poder imprimir
-            document.getElementById('confirmarVentaModal').setAttribute('data-venta-id', data.venta_id);
-            const modal = new bootstrap.Modal(document.getElementById('confirmarVentaModal'));
-            modal.show();
-            // Enfocar el botón de imprimir para acceso rápido con Enter
-            setTimeout(() => {
-                document.getElementById('btn-imprimir-ticket').focus();
-            }, 300);
-        } else {
-            alert('Error: ' + (data.error || 'No se pudo procesar la venta'));
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error al procesar la venta');
-    });
-}
-
 // Limpiar carrito
 function limpiarCarrito() {
     carrito = [];
@@ -763,11 +664,6 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'F1') {
         e.preventDefault();
         limpiarCarrito();
-    }
-    // F2 - Procesar venta
-    if (e.key === 'F2') {
-        e.preventDefault();
-        procesarVenta();
     }
     // F3 - Enfocar código de barras
     if (e.key === 'F3') {
@@ -869,4 +765,3 @@ document.getElementById('confirmarVentaModal').addEventListener('hidden.bs.modal
 {% block ayuda %}
 {% include 'inventario/ayuda_contextual.html' %}
 {% endblock %}
-
