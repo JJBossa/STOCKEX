@@ -74,22 +74,19 @@ python manage.py crear_grupos_permisos
 python manage.py crear_superusuario --username <usuario>
 ```
 
-6. Importa los productos desde el PDF:
+6. Previsualiza un catálogo Excel para importarlo:
 ```bash
-python manage.py importar_productos
+python manage.py importar_productos_excel catalogo.xlsx --dry-run
 ```
 
-7. Crea las categorías iniciales:
-```bash
-python manage.py crear_categorias
-```
+   Consulta la [guía STK-02](docs/funcionalidades/STK_02_IMPORTACION_PRODUCTOS_EXCEL.md) para confirmar la importación o usar la interfaz web.
 
-8. Inicia el servidor de desarrollo:
+7. Inicia el servidor de desarrollo:
 ```bash
 python manage.py runserver
 ```
 
-9. Accede a la aplicación:
+8. Accede a la aplicación:
    - Login: http://127.0.0.1:8000/login/
    - Admin: http://127.0.0.1:8000/admin/
 
@@ -158,7 +155,7 @@ proyecto_boti/
 
 Puedes modificar los productos desde:
 - El panel de administración de Django (`/admin/`)
-- El comando `importar_productos.py` para agregar más productos
+- La opción **Importar Excel** del catálogo o el comando `importar_productos_excel`
 
 ## 📚 Documentación
 
