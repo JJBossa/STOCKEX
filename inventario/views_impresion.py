@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.db.models import Q
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage, PageBreak
@@ -14,10 +15,9 @@ from reportlab.graphics import renderPDF
 import io
 import os
 import pytz
-from .models import Producto, Categoria, Venta, ItemVenta, LogAccion
+from .models import Producto, Categoria
 from .access import permiso_requerido, ventas_visibles
 from .utils import es_administrador, logger
-from django.contrib import messages
 
 @login_required
 def imprimir_etiquetas(request):
@@ -274,7 +274,9 @@ def generar_lista_precios_pdf(request):
     response['Content-Disposition'] = 'attachment; filename="lista_precios.pdf"'
     return response
 
-@permiso_requerido('inventario.view_venta')
+
+@never_cache
+@permiso_requerido("inventario.view_venta")
 def imprimir_ticket_venta(request, venta_id):
     """Genera ticket de venta - por defecto térmica 58mm, o A4 si se especifica tipo=a4"""
     tipo = request.GET.get('tipo', 'termica')  # 'termica' o 'a4'

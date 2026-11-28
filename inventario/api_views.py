@@ -5,15 +5,22 @@ Estos endpoints están en paralelo con los existentes, NO los reemplazan
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import F
+from django.db.models import F, Prefetch
 from django.db.models.deletion import ProtectedError
-from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
+from django_filters.rest_framework import DjangoFilterBackend, FilterSet, NumberFilter
 from typing import Optional
 
 from .models import (
-    Producto, Categoria, Venta,
-    Cotizacion, MovimientoStock,
-    NotificacionStock, Proveedor
+    Producto,
+    Categoria,
+    Venta,
+    ItemVenta,
+    Cotizacion,
+    MovimientoStock,
+    NotificacionStock,
+    Proveedor,
 )
 from .serializers import (
     ProductoSerializer, ProductoListSerializer, CategoriaSerializer,
@@ -137,22 +144,45 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     ordering = ['nombre']
 
 
+class FiltroVentasAPI(FilterSet):
+    usuario = NumberFilter(
+        method="filtrar_usuario",
+        min_value=1,
+        max_value=2**63 - 1,
+        max_digits=19,
+        decimal_places=0,
+    )
+
+    class Meta:
+        model = Venta
+        fields = ["metodo_pago", "cancelada", "usuario"]
+
+    def filtrar_usuario(self, ventas, nombre, usuario):
+        if es_administrador(self.request.user):
+            return ventas.filter(usuario_id=usuario)
+        return ventas
+
+
+@method_decorator(never_cache, name="dispatch")
 class VentaViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet para consultar ventas (solo lectura)
-    El registro de ventas se realiza en /pos/registrar-venta/.
-    """
-    queryset = Venta.objects.all().select_related('usuario').prefetch_related('items')
+    """Consulta de ventas. Conserva el contrato y el alcance de la API."""
+
+    queryset = Venta.objects.all()
     serializer_class = VentaSerializer
     permission_classes = [PermisosModelo]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['metodo_pago', 'cancelada', 'usuario']
-    ordering_fields = ['fecha', 'total']
-    ordering = ['-fecha']
-    
-    def get_queryset(self):
-        return ventas_visibles(self.request.user).select_related('usuario').prefetch_related('items')
+    filterset_class = FiltroVentasAPI
+    ordering_fields = ["fecha", "total"]
+    ordering = ["-fecha", "-pk"]
 
+    def get_queryset(self):
+        return (
+            ventas_visibles(self.request.user)
+            .select_related("usuario")
+            .prefetch_related(
+                Prefetch("items", queryset=ItemVenta.objects.select_related("producto"))
+            )
+        )
 
 
 class CotizacionViewSet(viewsets.ModelViewSet):
