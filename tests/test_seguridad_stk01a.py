@@ -60,11 +60,18 @@ def venta(operador, producto):
 def cuenta(venta):
     cliente = Cliente.objects.create(nombre='Cliente de regresión')
     cuenta = CuentaPorCobrar.objects.create(
-        cliente=cliente, venta=venta, monto_total=venta.total,
-        fecha_emision=timezone.localdate(), fecha_vencimiento=timezone.localdate(),
+        cliente=cliente,
+        venta=venta,
+        monto_total=venta.total,
+        monto_pagado=1000,
+        estado="parcial",
+        fecha_emision=timezone.localdate(),
+        fecha_vencimiento=timezone.localdate(),
     )
     PagoCliente.objects.create(
-        cuenta_por_cobrar=cuenta, monto=1000, metodo_pago='efectivo',
+        cuenta_por_cobrar=cuenta,
+        monto=1000,
+        metodo_pago="efectivo",
         fecha_pago=timezone.localdate(),
     )
     return cuenta

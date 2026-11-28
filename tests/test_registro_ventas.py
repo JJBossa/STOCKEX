@@ -231,12 +231,17 @@ def test_json_invalido(pos, payload):
     assert not Venta.objects.exists()
 
 
-@pytest.mark.parametrize("metodo", ["credito", "mixto", "cheque", "", None, {}])
+@pytest.mark.parametrize("metodo", ["mixto", "cheque", "", None, {}])
 def test_metodos_de_pago_excluidos(pos, metodo):
     respuesta = enviar(pos, rapida(metodo_pago=metodo))
     assert respuesta.status_code == 400
     assert respuesta.json()["error"] == "metodo_pago_invalido"
     assert not Venta.objects.exists()
+
+
+def test_credito_exige_permiso_adicional(pos):
+    assert enviar(pos, rapida(metodo_pago="credito", cliente_id=1)).status_code == 403
+    assert not Venta.objects.exists() and not RegistroVenta.objects.exists()
 
 
 def test_pago_en_efectivo_calcula_vuelto_y_rechaza_importe_insuficiente(pos):

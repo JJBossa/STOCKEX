@@ -15,6 +15,7 @@ from .views_caja import (
     contexto_cierre,
     cursor_pagina,
     pagos_resumen,
+    recibido_resumen,
 )
 
 IMPORTES = {
@@ -72,6 +73,25 @@ def metricas_resumen(resumen):
                 (f"{nombre} · ventas", pago["cantidad"], False),
             ]
         )
+    if "abonos" in resumen:
+        abonos = resumen["abonos"]
+        metricas.extend(
+            [
+                ("Abonos recibidos", abonos["importe"], True),
+                ("Cantidad de abonos", abonos["cantidad"], False),
+            ]
+        )
+        for metodo, pago in abonos["por_metodo"].items():
+            metricas.extend(
+                [
+                    (f"{METODOS[metodo]} · abonos", pago["importe"], True),
+                    (
+                        f"{METODOS[metodo]} · cantidad de abonos",
+                        pago["cantidad"],
+                        False,
+                    ),
+                ]
+            )
     return [(etiqueta, str(valor), importe) for etiqueta, valor, importe in metricas]
 
 
@@ -93,6 +113,7 @@ def gestion(request):
         "sesion": sesion,
         "resumen": resumen,
         "pagos": pagos_resumen(resumen) if resumen is not None else [],
+        "recibido": recibido_resumen(resumen) if resumen is not None else [],
         "estado": estado,
         "max_importe": caja.MAX_IMPORTE,
         "max_contado": caja.MAX_CONTADO,

@@ -34,9 +34,32 @@
             <tbody>
                 <tr><th scope="row">Efectivo inicial</th><td class="text-end">{{ resumen.efectivo_inicial|clp }}</td></tr>
                 <tr><th scope="row">Ventas en efectivo</th><td class="text-end">{{ resumen.por_metodo.efectivo.importe|clp }}</td></tr>
+                {% if recibido %}
+                <tr><th scope="row">Abonos en efectivo</th><td class="text-end">{{ resumen.abonos.por_metodo.efectivo.importe|clp }}</td></tr>
+                {% endif %}
                 <tr><th scope="row">Ingresos adicionales ({{ resumen.cantidad_ingresos }})</th><td class="text-end">{{ resumen.ingresos|clp }}</td></tr>
                 <tr><th scope="row">Retiros ({{ resumen.cantidad_retiros }})</th><td class="text-end">{{ resumen.retiros|clp }}</td></tr>
             </tbody>
         </table>
     </div>
 </div>
+{% if recibido %}
+<section class="mb-3" aria-labelledby="caja-titulo-abonos">
+    <h3 id="caja-titulo-abonos" class="h6">Ventas fiadas y cobros</h3>
+    <p class="mb-2">
+        Pago inmediato {{ resumen.ventas_directas.importe|clp }} ({{ resumen.ventas_directas.cantidad }}) ·
+        Fiados {{ resumen.fiados.importe|clp }} ({{ resumen.fiados.cantidad }}) ·
+        Abonos {{ resumen.abonos.importe|clp }} ({{ resumen.abonos.cantidad }})
+    </p>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Cobros por método de pago">
+        <table class="table table-sm align-middle mb-0">
+            <thead><tr><th scope="col">Método</th><th scope="col" class="text-end">Ventas directas</th><th scope="col" class="text-end">Abonos</th><th scope="col" class="text-end">Total recibido</th></tr></thead>
+            <tbody>
+                {% for metodo, cobros, abonos in recibido %}
+                <tr><th scope="row">{{ metodo }}</th><td class="text-end">{{ cobros.ventas_directas|clp }}</td><td class="text-end">{{ cobros.abonos|clp }} ({{ abonos.cantidad }})</td><td class="text-end">{{ cobros.total|clp }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}

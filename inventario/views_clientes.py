@@ -4,15 +4,21 @@ Vistas para gestión de clientes
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Q, Sum, Count
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.cache import never_cache
 from .models import Cliente, Venta, CuentaPorCobrar
 from .utils import es_administrador, normalizar_texto, logger
 from .access import permiso_requerido
+from .caja import ErrorCaja, transaccion_caja
+from .fiados import validar_limite_credito
 
 
+@never_cache
 @permiso_requerido('inventario.view_cliente', administrativo=True)
 def listar_clientes(request):
     """Lista todos los clientes con búsqueda y filtros"""
@@ -61,26 +67,26 @@ def listar_clientes(request):
         'orden': orden,
         'es_admin': es_administrador(request.user),
     }
-    
-    return render(request, 'inventario/listar_clientes.html', context)
+
+    return render(request, "inventario/listar_clientes.html", context)
 
 
-@permiso_requerido('inventario.add_cliente')
+@permiso_requerido("inventario.add_cliente", administrativo=True)
 def crear_cliente(request):
     """Crear un nuevo cliente"""
-    if request.method == 'POST':
-        nombre = request.POST.get('nombre', '').strip()
-        rut = request.POST.get('rut', '').strip() or None
-        tipo_cliente = request.POST.get('tipo_cliente', 'natural')
-        email = request.POST.get('email', '').strip() or None
-        telefono = request.POST.get('telefono', '').strip() or None
-        direccion = request.POST.get('direccion', '').strip() or None
-        contacto = request.POST.get('contacto', '').strip() or None
-        limite_credito = request.POST.get('limite_credito', '0') or '0'
-        notas = request.POST.get('notas', '').strip() or None
-        
+    if request.method == "POST":
+        nombre = request.POST.get("nombre", "").strip()
+        rut = request.POST.get("rut", "").strip() or None
+        tipo_cliente = request.POST.get("tipo_cliente", "natural")
+        email = request.POST.get("email", "").strip() or None
+        telefono = request.POST.get("telefono", "").strip() or None
+        direccion = request.POST.get("direccion", "").strip() or None
+        contacto = request.POST.get("contacto", "").strip() or None
+        limite_credito = request.POST.get("limite_credito", "0") or "0"
+        notas = request.POST.get("notas", "").strip() or None
+
         if not nombre:
-            messages.error(request, 'El nombre es requerido.')
+            messages.error(request, "El nombre es requerido.")
         else:
             try:
                 cliente = Cliente.objects.create(
@@ -91,108 +97,152 @@ def crear_cliente(request):
                     telefono=telefono,
                     direccion=direccion,
                     contacto=contacto,
-                    limite_credito=float(limite_credito) if limite_credito else 0,
-                    notas=notas
+                    limite_credito=Cliente._meta.get_field("limite_credito").clean(
+                        limite_credito, None
+                    ),
+                    notas=notas,
                 )
-                messages.success(request, f'Cliente "{cliente.nombre}" creado exitosamente.')
-                return redirect('detalle_cliente', cliente_id=cliente.id)
-            except Exception as e:
-                logger.error(f'Error al crear cliente: {str(e)}')
-                messages.error(request, f'Error al crear cliente: {str(e)}')
-    
-    return render(request, 'inventario/crear_cliente.html', {
-        'es_admin': True,
-    })
+                messages.success(
+                    request, f'Cliente "{cliente.nombre}" creado exitosamente.'
+                )
+                return redirect("detalle_cliente", cliente_id=cliente.id)
+            except ValidationError as error:
+                messages.error(request, " ".join(error.messages))
+            except IntegrityError:
+                messages.error(
+                    request, "Revisa que el RUT no esté registrado para otro cliente."
+                )
+
+    return render(
+        request,
+        "inventario/crear_cliente.html",
+        {
+            "es_admin": True,
+        },
+    )
 
 
-@permiso_requerido('inventario.view_cliente', administrativo=True)
+@never_cache
+@permiso_requerido("inventario.view_cliente", administrativo=True)
 def detalle_cliente(request, cliente_id):
     """Detalle de un cliente con historial"""
     cliente = get_object_or_404(Cliente, id=cliente_id)
-    
+
     # Ventas del cliente
-    ventas = Venta.objects.filter(cliente=cliente, cancelada=False).order_by('-fecha')[:10]
-    
+    ventas = Venta.objects.filter(cliente=cliente, cancelada=False).order_by("-fecha")[
+        :10
+    ]
+
     # Cuentas por cobrar
-    cuentas_por_cobrar = CuentaPorCobrar.objects.filter(cliente=cliente).order_by('-fecha_emision')[:10]
-    
+    cuentas_por_cobrar = CuentaPorCobrar.objects.filter(cliente=cliente).order_by(
+        "-fecha_emision"
+    )[:10]
+
     # Estadísticas
     total_ventas = cliente.total_compras
     cantidad_ventas = cliente.cantidad_ventas
     saldo_pendiente = cliente.saldo_pendiente
-    
+
     context = {
-        'cliente': cliente,
-        'ventas': ventas,
-        'cuentas_por_cobrar': cuentas_por_cobrar,
-        'total_ventas': total_ventas,
-        'cantidad_ventas': cantidad_ventas,
-        'saldo_pendiente': saldo_pendiente,
-        'es_admin': es_administrador(request.user),
+        "cliente": cliente,
+        "ventas": ventas,
+        "cuentas_por_cobrar": cuentas_por_cobrar,
+        "total_ventas": total_ventas,
+        "cantidad_ventas": cantidad_ventas,
+        "saldo_pendiente": saldo_pendiente,
+        "es_admin": es_administrador(request.user),
     }
-    
-    return render(request, 'inventario/detalle_cliente.html', context)
+
+    return render(request, "inventario/detalle_cliente.html", context)
 
 
-@permiso_requerido('inventario.change_cliente')
+@permiso_requerido("inventario.change_cliente", administrativo=True)
 def editar_cliente(request, cliente_id):
-    """Editar un cliente existente"""
-    cliente = get_object_or_404(Cliente, id=cliente_id)
-    
-    if request.method == 'POST':
-        cliente.nombre = request.POST.get('nombre', '').strip()
-        cliente.rut = request.POST.get('rut', '').strip() or None
-        cliente.tipo_cliente = request.POST.get('tipo_cliente', 'natural')
-        cliente.email = request.POST.get('email', '').strip() or None
-        cliente.telefono = request.POST.get('telefono', '').strip() or None
-        cliente.direccion = request.POST.get('direccion', '').strip() or None
-        cliente.contacto = request.POST.get('contacto', '').strip() or None
-        limite_credito = request.POST.get('limite_credito', '0') or '0'
-        cliente.limite_credito = float(limite_credito) if limite_credito else 0
-        cliente.activo = request.POST.get('activo') == 'on'
-        cliente.notas = request.POST.get('notas', '').strip() or None
-        
+    if request.method == "POST":
         try:
-            cliente.save()
-            messages.success(request, f'Cliente "{cliente.nombre}" actualizado exitosamente.')
-            return redirect('detalle_cliente', cliente_id=cliente.id)
-        except Exception as e:
-            logger.error(f'Error al editar cliente: {str(e)}')
-            messages.error(request, f'Error al actualizar cliente: {str(e)}')
-    
-    return render(request, 'inventario/editar_cliente.html', {
-        'cliente': cliente,
-        'es_admin': True,
-    })
+            with transaccion_caja():
+                cliente = get_object_or_404(Cliente, pk=cliente_id)
+                limite = Cliente._meta.get_field("limite_credito").clean(
+                    request.POST.get("limite_credito") or "0", cliente
+                )
+                validar_limite_credito(cliente, limite)
+                cliente.limite_credito = limite
+                cliente.nombre = request.POST.get("nombre", "").strip()
+                if not cliente.nombre:
+                    raise ValidationError("El nombre es requerido.")
+                cliente.tipo_cliente = request.POST.get("tipo_cliente", "natural")
+                for campo in (
+                    "rut",
+                    "email",
+                    "telefono",
+                    "direccion",
+                    "contacto",
+                    "notas",
+                ):
+                    setattr(cliente, campo, request.POST.get(campo, "").strip() or None)
+                cliente.activo = request.POST.get("activo") == "on"
+                cliente.save()
+            messages.success(
+                request, f'Cliente "{cliente.nombre}" actualizado exitosamente.'
+            )
+            return redirect("detalle_cliente", cliente_id=cliente_id)
+        except ValidationError as error:
+            messages.error(request, " ".join(error.messages))
+        except ErrorCaja as error:
+            messages.error(request, error.datos["mensaje"])
+            if error.estado == 503:
+                return HttpResponse(
+                    error.datos["mensaje"], status=503, headers={"Retry-After": "1"}
+                )
+        except IntegrityError:
+            messages.error(
+                request, "Revisa que el RUT no esté registrado para otro cliente."
+            )
+
+    cliente = get_object_or_404(Cliente, pk=cliente_id)
+    return render(
+        request,
+        "inventario/editar_cliente.html",
+        {"cliente": cliente, "es_admin": True},
+    )
 
 
-@permiso_requerido('inventario.delete_cliente')
+@permiso_requerido("inventario.delete_cliente", administrativo=True)
 def eliminar_cliente(request, cliente_id):
     """Eliminar un cliente (solo si no tiene ventas)"""
     cliente = get_object_or_404(Cliente, id=cliente_id)
-    
-    if request.method == 'POST':
-        # Verificar si tiene ventas
-        if Venta.objects.filter(cliente=cliente).exists():
-            messages.error(request, f'No se puede eliminar el cliente "{cliente.nombre}" porque tiene ventas asociadas.')
-            return redirect('detalle_cliente', cliente_id=cliente.id)
-        
-        nombre = cliente.nombre
+
+    if request.method == "POST":
         try:
-            cliente.delete()
+            with transaccion_caja():
+                cliente = get_object_or_404(Cliente, pk=cliente_id)
+                cliente.delete()
         except ProtectedError:
-            messages.error(request, 'No se puede eliminar un cliente con cuentas por cobrar.')
-            return redirect('detalle_cliente', cliente_id=cliente.id)
-        messages.success(request, f'Cliente "{nombre}" eliminado exitosamente.')
-        return redirect('listar_clientes')
-    
-    return render(request, 'inventario/eliminar_cliente.html', {
-        'cliente': cliente,
-        'es_admin': True,
-    })
+            messages.error(
+                request, "No se puede eliminar un cliente con historial financiero."
+            )
+            return redirect("detalle_cliente", cliente_id=cliente_id)
+        except ErrorCaja as error:
+            return HttpResponse(
+                error.datos["mensaje"],
+                status=error.estado,
+                headers={"Retry-After": "1"},
+            )
+        messages.success(request, f'Cliente "{cliente.nombre}" eliminado exitosamente.')
+        return redirect("listar_clientes")
+
+    return render(
+        request,
+        "inventario/eliminar_cliente.html",
+        {
+            "cliente": cliente,
+            "es_admin": True,
+        },
+    )
 
 
-@permiso_requerido('inventario.view_cliente')
+@never_cache
+@permiso_requerido("inventario.view_cliente")
 def buscar_cliente_api(request):
     """API para buscar clientes (autocompletado)"""
     query = request.GET.get('q', '').strip()

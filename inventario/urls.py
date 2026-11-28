@@ -5,6 +5,7 @@ from .views_registro_ventas import registrar_venta_pos
 from . import views
 from . import views_caja
 from . import views_gestion_caja
+from . import views_fiados
 from . import views_extra
 from . import views_facturas
 from . import views_usuarios
@@ -35,6 +36,32 @@ urlpatterns = [
     path("api/catalogo-productos/", catalogo_productos, name="catalogo_productos"),
     path("pos/registrar-venta/", registrar_venta_pos, name="registrar_venta_pos"),
     path("pos/estado-caja/", views_pos.estado_caja_pos, name="pos_estado_caja"),
+    path(
+        "fiados/clientes/", views_fiados.buscar_clientes, name="fiados_buscar_clientes"
+    ),
+    path(
+        "fiados/clientes/<int:cliente_id>/saldo/",
+        views_fiados.saldo,
+        name="fiados_saldo",
+    ),
+    path(
+        "fiados/clientes/<int:cliente_id>/cuentas/",
+        views_fiados.pendientes,
+        name="fiados_pendientes",
+    ),
+    path(
+        "fiados/cuentas/<int:cuenta_id>/", views_fiados.detalle, name="fiados_detalle"
+    ),
+    path(
+        "fiados/cuentas/<int:cuenta_id>/abonos/",
+        views_fiados.abonos,
+        name="fiados_abonos",
+    ),
+    path(
+        "fiados/cuentas/<int:cuenta_id>/abonar/",
+        views_fiados.abonar,
+        name="fiados_abonar",
+    ),
     path("caja/", views_gestion_caja.gestion, name="caja_gestion"),
     path("caja/historial/", views_gestion_caja.historial, name="caja_historial"),
     path(

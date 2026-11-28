@@ -417,6 +417,7 @@ class Venta(models.Model):
         permissions = (
             ("registrar_venta", "Puede registrar ventas de punto de venta"),
             ("anular_venta", "Puede anular ventas de punto de venta"),
+            ("registrar_venta_fiada", "Puede registrar ventas fiadas"),
         )
         indexes = [
             models.Index(fields=["-fecha", "-id"], name="venta_fecha_id_desc_idx")
@@ -596,6 +597,7 @@ class Cliente(models.Model):
         max_digits=12, 
         decimal_places=0, 
         default=0, 
+        validators=[MinValueValidator(0)],
         verbose_name="Límite de Crédito",
         help_text="Monto máximo de crédito permitido (0 = sin límite)"
     )
@@ -633,120 +635,211 @@ class Cliente(models.Model):
     
     @property
     def saldo_pendiente(self):
-        """Calcula el saldo pendiente de cuentas por cobrar"""
-        from django.db.models import Sum
-        total = CuentaPorCobrar.objects.filter(
-            cliente=self,
-            estado__in=['pendiente', 'parcial']
-        ).aggregate(
-            saldo=Sum('monto_total') - Sum('monto_pagado')
-        )['saldo'] or 0
-        return max(0, total)
+        """Calcula el saldo pendiente de cuentas por cobrar."""
+        return (
+            CuentaPorCobrar.objects.filter(
+                cliente=self, estado__in=CuentaPorCobrar.ESTADOS_PENDIENTES
+            ).aggregate(saldo=Sum("monto_total") - Sum("monto_pagado"))["saldo"]
+            or 0
+        )
+
+
+def numero_cuenta_por_cobrar():
+    return f"CC-{uuid.uuid4().hex}"
 
 
 class CuentaPorCobrar(models.Model):
     """Modelo para gestionar cuentas por cobrar (créditos a clientes)"""
+
+    ESTADOS_PENDIENTES = ("pendiente", "parcial", "vencido")
     ESTADO_CHOICES = [
-        ('pendiente', 'Pendiente'),
-        ('parcial', 'Pago Parcial'),
-        ('pagado', 'Pagado'),
-        ('vencido', 'Vencido'),
-        ('cancelado', 'Cancelado'),
+        ("pendiente", "Pendiente"),
+        ("parcial", "Pago Parcial"),
+        ("pagado", "Pagado"),
+        ("vencido", "Vencido"),
+        ("cancelado", "Cancelado"),
     ]
-    
-    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='cuentas_por_cobrar', verbose_name="Cliente")
-    venta = models.ForeignKey(Venta, on_delete=models.SET_NULL, null=True, blank=True, related_name='cuenta_por_cobrar', verbose_name="Venta Relacionada")
-    numero_documento = models.CharField(max_length=50, unique=True, verbose_name="Número de Documento")
-    monto_total = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="Monto Total")
-    monto_pagado = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Monto Pagado")
+
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name="cuentas_por_cobrar",
+        verbose_name="Cliente",
+    )
+    venta = models.ForeignKey(
+        Venta,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cuenta_por_cobrar",
+        verbose_name="Venta Relacionada",
+    )
+    numero_documento = models.CharField(
+        max_length=50,
+        unique=True,
+        default=numero_cuenta_por_cobrar,
+        verbose_name="Número de Documento",
+    )
+    fiado_seguro = models.BooleanField(default=False, editable=False)
+    monto_total = models.DecimalField(
+        max_digits=12, decimal_places=0, verbose_name="Monto Total"
+    )
+    monto_pagado = models.DecimalField(
+        max_digits=12, decimal_places=0, default=0, verbose_name="Monto Pagado"
+    )
     fecha_emision = models.DateField(verbose_name="Fecha de Emisión")
-    fecha_vencimiento = models.DateField(verbose_name="Fecha de Vencimiento")
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', verbose_name="Estado")
+    fecha_vencimiento = models.DateField(
+        null=True, blank=True, verbose_name="Fecha de Vencimiento"
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default="pendiente",
+        verbose_name="Estado",
+    )
     notas = models.TextField(blank=True, null=True, verbose_name="Notas")
-    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
-    
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True, verbose_name="Fecha de Creación"
+    )
+
     class Meta:
         verbose_name = "Cuenta por Cobrar"
         verbose_name_plural = "Cuentas por Cobrar"
-        ordering = ['-fecha_emision']
-        indexes = [
-            models.Index(fields=['cliente', 'estado']),
-            models.Index(fields=['fecha_vencimiento']),
-            models.Index(fields=['estado', 'fecha_vencimiento']),
+        permissions = (
+            ("consultar_cuentas_por_cobrar", "Puede consultar cuentas por cobrar"),
+        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["venta"],
+                condition=models.Q(fiado_seguro=True),
+                name="fiado_una_deuda_por_venta",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fiado_seguro=False)
+                | (
+                    models.Q(
+                        venta__isnull=False, monto_total__gt=0, monto_pagado__gte=0
+                    )
+                    & (
+                        models.Q(estado__in=["pendiente", "cancelado"], monto_pagado=0)
+                        | models.Q(
+                            estado="parcial",
+                            monto_pagado__gt=0,
+                            monto_pagado__lt=models.F("monto_total"),
+                        )
+                        | models.Q(
+                            estado="pagado", monto_pagado=models.F("monto_total")
+                        )
+                    )
+                ),
+                name="fiado_saldo_estado_coherentes",
+            ),
         ]
-    
+        ordering = ["-fecha_emision"]
+        indexes = [
+            models.Index(fields=["cliente", "estado"]),
+            models.Index(fields=["fecha_vencimiento"]),
+            models.Index(fields=["estado", "fecha_vencimiento"]),
+        ]
+
     def __str__(self):
         return f"{self.numero_documento} - {self.cliente.nombre} - ${self.monto_total:,.0f}"
-    
+
     @property
     def saldo_pendiente(self):
-        """Calcula el saldo pendiente"""
-        return max(0, self.monto_total - self.monto_pagado)
-    
+        return 0 if self.estado == "cancelado" else self.monto_total - self.monto_pagado
+
     @property
     def esta_vencida(self):
-        """Verifica si la cuenta está vencida"""
+        from .historial_ventas import SANTIAGO
         from django.utils import timezone
-        return timezone.now().date() > self.fecha_vencimiento and self.estado in ['pendiente', 'parcial']
-    
-    def save(self, *args, **kwargs):
-        """Actualiza el estado según el monto pagado"""
-        if not self.numero_documento:
-            from datetime import datetime
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            self.numero_documento = f"CC-{timestamp}"
-        
-        # Actualizar estado según pagos
-        if self.monto_pagado >= self.monto_total:
-            self.estado = 'pagado'
-        elif self.monto_pagado > 0:
-            self.estado = 'parcial'
-        elif self.estado == 'pagado' and self.monto_pagado < self.monto_total:
-            self.estado = 'pendiente'
-        
-        super().save(*args, **kwargs)
+
+        return (
+            self.fecha_vencimiento is not None
+            and self.estado in self.ESTADOS_PENDIENTES
+            and self.saldo_pendiente > 0
+            and self.fecha_vencimiento < timezone.localdate(timezone=SANTIAGO)
+        )
 
 
 class PagoCliente(models.Model):
     """Modelo para registrar pagos de clientes"""
+
+    METODOS_ABONO = ("efectivo", "tarjeta", "transferencia")
     METODO_PAGO_CHOICES = [
-        ('efectivo', 'Efectivo'),
-        ('transferencia', 'Transferencia'),
-        ('cheque', 'Cheque'),
-        ('tarjeta', 'Tarjeta'),
-        ('otro', 'Otro'),
+        ("efectivo", "Efectivo"),
+        ("transferencia", "Transferencia"),
+        ("cheque", "Cheque"),
+        ("tarjeta", "Tarjeta"),
+        ("otro", "Otro"),
     ]
-    
-    cuenta_por_cobrar = models.ForeignKey(CuentaPorCobrar, on_delete=models.CASCADE, related_name='pagos', verbose_name="Cuenta por Cobrar")
+
+    cuenta_por_cobrar = models.ForeignKey(
+        CuentaPorCobrar,
+        on_delete=models.PROTECT,
+        related_name="pagos",
+        verbose_name="Cuenta por Cobrar",
+    )
     monto = models.DecimalField(max_digits=12, decimal_places=0, verbose_name="Monto")
     fecha_pago = models.DateField(verbose_name="Fecha de Pago")
-    metodo_pago = models.CharField(max_length=20, choices=METODO_PAGO_CHOICES, default='efectivo', verbose_name="Método de Pago")
-    referencia = models.CharField(max_length=200, blank=True, null=True, verbose_name="Referencia", help_text="Número de cheque, transferencia, etc.")
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=METODO_PAGO_CHOICES,
+        default="efectivo",
+        verbose_name="Método de Pago",
+    )
+    referencia = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        verbose_name="Referencia",
+        help_text="Número de cheque, transferencia, etc.",
+    )
     notas = models.TextField(blank=True, null=True, verbose_name="Notas")
-    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Registrado por")
-    fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
-    
+    usuario = models.ForeignKey(
+        User, on_delete=models.PROTECT, null=True, verbose_name="Registrado por"
+    )
+    sesion_caja = models.ForeignKey(
+        "SesionCaja",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="abonos",
+    )
+    clave = models.UUIDField(null=True, blank=True, editable=False)
+    fecha_registro = models.DateTimeField(
+        auto_now_add=True, verbose_name="Fecha de Registro"
+    )
+
     class Meta:
         verbose_name = "Pago de Cliente"
         verbose_name_plural = "Pagos de Clientes"
-        ordering = ['-fecha_pago']
-        indexes = [
-            models.Index(fields=['cuenta_por_cobrar', 'fecha_pago']),
+        permissions = (("registrar_abono", "Puede registrar abonos de clientes"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "clave"],
+                condition=models.Q(clave__isnull=False),
+                name="abono_clave_por_usuario",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(clave__isnull=True, sesion_caja__isnull=True)
+                | models.Q(
+                    clave__isnull=False,
+                    sesion_caja__isnull=False,
+                    usuario__isnull=False,
+                    monto__gt=0,
+                    metodo_pago__in=["efectivo", "tarjeta", "transferencia"],
+                ),
+                name="abono_seguro_datos_completos",
+            ),
         ]
-    
+        ordering = ["-fecha_pago"]
+        indexes = [
+            models.Index(fields=["cuenta_por_cobrar", "fecha_pago"]),
+        ]
+
     def __str__(self):
         return f"Pago ${self.monto:,.0f} - {self.cuenta_por_cobrar.cliente.nombre} - {self.fecha_pago}"
-    
-    def save(self, *args, **kwargs):
-        """Actualiza el monto pagado de la cuenta por cobrar"""
-        super().save(*args, **kwargs)
-        # Actualizar monto pagado de la cuenta
-        cuenta = self.cuenta_por_cobrar
-        from django.db.models import Sum
-        cuenta.monto_pagado = cuenta.pagos.aggregate(
-            total=Sum('monto')
-        )['total'] or 0
-        cuenta.save()
 
 
 class Almacen(models.Model):
@@ -1205,13 +1298,38 @@ class Devolucion(models.Model):
         ('completa', 'Devolución Completa'),
         ('parcial', 'Devolución Parcial'),
     ]
-    
-    numero_devolucion = models.CharField(max_length=50, unique=True, verbose_name="Número de Devolución")
-    venta = models.ForeignKey('Venta', on_delete=models.CASCADE, related_name='devoluciones', verbose_name="Venta")
-    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, related_name='devoluciones', verbose_name="Cliente")
-    tipo_devolucion = models.CharField(max_length=20, choices=TIPO_DEVOLUCION_CHOICES, verbose_name="Tipo de Devolución")
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente', verbose_name="Estado")
-    monto_devolver = models.DecimalField(max_digits=10, decimal_places=0, verbose_name="Monto a Devolver")
+
+    numero_devolucion = models.CharField(
+        max_length=50, unique=True, verbose_name="Número de Devolución"
+    )
+    venta = models.ForeignKey(
+        "Venta",
+        on_delete=models.CASCADE,
+        related_name="devoluciones",
+        verbose_name="Venta",
+    )
+    cliente = models.ForeignKey(
+        "Cliente",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="devoluciones",
+        verbose_name="Cliente",
+    )
+    tipo_devolucion = models.CharField(
+        max_length=20,
+        choices=TIPO_DEVOLUCION_CHOICES,
+        verbose_name="Tipo de Devolución",
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default="pendiente",
+        verbose_name="Estado",
+    )
+    monto_devolver = models.DecimalField(
+        max_digits=10, decimal_places=0, verbose_name="Monto a Devolver"
+    )
     metodo_reembolso = models.CharField(
         max_length=20,
         choices=[
@@ -1259,6 +1377,9 @@ class Devolucion(models.Model):
         if self.estado != 'pendiente':
             raise ValueError('Solo se pueden procesar devoluciones pendientes')
         
+        if self.metodo_reembolso == "credito":
+            raise ValueError("Una devolución de crédito requiere reversión financiera.")
+
         from django.utils import timezone
         from django.db import transaction
         
@@ -1284,23 +1405,6 @@ class Devolucion(models.Model):
                     usuario=usuario_procesador,
                     notas=f'Devolución #{self.numero_devolucion} de venta {self.venta.numero_venta}'
                 )
-            
-            # Si es crédito en cuenta, actualizar cuenta por cobrar
-            if self.metodo_reembolso == 'credito' and self.cliente:
-                from .models import CuentaPorCobrar
-                # Reducir el monto de la cuenta por cobrar
-                cuentas = CuentaPorCobrar.objects.filter(
-                    cliente=self.cliente,
-                    venta=self.venta,
-                    estado__in=['pendiente', 'parcial']
-                )
-                for cuenta in cuentas:
-                    cuenta.monto_pagado += self.monto_devolver
-                    if cuenta.monto_pagado >= cuenta.monto_total:
-                        cuenta.estado = 'pagada'
-                    else:
-                        cuenta.estado = 'parcial'
-                    cuenta.save()
             
             # Actualizar estado de la devolución
             self.estado = 'procesada'

@@ -433,6 +433,32 @@ try {
         await texto(el(gestion, "diferencia").locator(".."), /9\.007\.199\.254\.740\.992/);
     });
 
+    await prueba("un abono aparece en Caja y obliga a reconfirmar sin duplicar la venta fiada", async () => {
+        const respuesta = await gestion.request.get(origen + "/fiados/clientes/?q=sintético");
+        const {clientes: [deudor]} = await respuesta.json();
+        const venta = await escribir(gestion, "/pos/registrar-venta/", {
+            modalidad: "rapida", metodo_pago: "credito", monto: 500, cliente_id: deudor.id,
+        });
+        assert.equal(venta.status(), 201);
+        const {cuenta_id: deuda} = await venta.json();
+        await el(gestion, "actualizar").click();
+        await texto(el(gestion, "resumen"), /Fiados \$500/);
+        await revisar(gestion, 119, "Conteo verificado");
+        const abono = await escribir(gestion, `/fiados/cuentas/${deuda}/abonar/`, {
+            importe: 120, metodo_pago: "efectivo",
+        });
+        assert.equal(abono.status(), 201);
+        const rechazo = await postUI(gestion, /\/caja\/\d+\/cerrar\/$/, () => btn(gestion, "Confirmar cierre").click());
+        assert.equal((await rechazo.json()).error, "resumen_cambiado");
+        await texto(el(gestion, "cambios"), /Abonos recibidos pasó de \$0 a \$120/);
+        await texto(el(gestion, "diferencia").locator(".."), /Caja cuadrada/);
+        await btn(gestion, "Revisar cierre").click();
+        await btn(gestion, "Confirmar cierre").click();
+        await gestion.waitForURL(/\/caja\/historial\/\d+\/$/);
+        await texto(gestion.locator("main"), /Abonos \$120/);
+        await texto(gestion.locator("main"), "1 venta vigente");
+    });
+
     assert.deepEqual(errores, []);
 } catch (error) {
     const log = await readFile(join(temporal, "django.log"), "utf8").catch(() => "");

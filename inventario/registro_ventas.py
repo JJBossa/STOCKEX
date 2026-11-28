@@ -6,6 +6,8 @@ from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 
 from .bloqueo_caja import bloquear_caja, invalidar_resumen, sesion_activa
+from .caja import texto
+from .fiados import REGISTRAR_FIADO, crear_deuda, fecha_opcional, validar_cliente_fiado
 from .models import ItemVenta, Producto, RegistroVenta, Venta
 from .peticion_financiera import uuid_v4
 
@@ -30,6 +32,7 @@ class ResultadoRegistroVenta:
     venta: Venta
     items: list[ItemVenta]
     repetida: bool = False
+    cuenta_id: int | None = None
 
 
 def entero_positivo(valor, campo, maximo):
@@ -88,29 +91,49 @@ def normalizar_venta(datos):
             "modalidad_invalida", "Usa la modalidad rapida o detallada."
         )
     campo = "monto" if modalidad == Venta.Modalidad.RAPIDA else "items"
-    if datos.keys() - {"modalidad", "metodo_pago", "monto_recibido", campo}:
+    metodo_pago = datos.get("metodo_pago")
+    fiada = metodo_pago == "credito"
+    adicionales = {"cliente_id", "fecha_vencimiento", "notas"} if fiada else set()
+    if datos.keys() - (
+        {"modalidad", "metodo_pago", "monto_recibido", campo} | adicionales
+    ):
         raise ErrorRegistroVenta(
             "campos_invalidos", "La solicitud contiene campos no admitidos."
         )
-    metodo_pago = datos.get("metodo_pago")
-    if metodo_pago not in METODOS_PAGO:
+    if not fiada and metodo_pago not in METODOS_PAGO:
         raise ErrorRegistroVenta(
             "metodo_pago_invalido", "Usa efectivo, tarjeta o transferencia."
         )
     recibido = datos.get("monto_recibido")
-    if "monto_recibido" in datos:
+    if fiada:
+        if "monto_recibido" in datos and (type(recibido) is not int or recibido != 0):
+            raise ErrorRegistroVenta(
+                "abono_inicial_invalido",
+                "Las ventas fiadas se registran sin abono inicial.",
+            )
+        recibido = 0
+    elif "monto_recibido" in datos:
         recibido = entero_positivo(recibido, "monto_recibido", MAX_MONTO)
     detalle = (
         entero_positivo(datos.get(campo), campo, MAX_MONTO)
         if campo == "monto"
         else normalizar_items(datos.get(campo))
     )
-    return {
+    normalizados = {
         "modalidad": modalidad,
         "metodo_pago": metodo_pago,
         "monto_recibido": recibido,
         campo: detalle,
     }
+    if fiada:
+        normalizados.update(
+            cliente_id=entero_positivo(
+                datos.get("cliente_id"), "cliente_id", MAX_ID_PRODUCTO
+            ),
+            fecha_vencimiento=fecha_opcional(datos.get("fecha_vencimiento")),
+            notas=texto(datos.get("notas", ""), "notas", 0, 500),
+        )
+    return normalizados
 
 
 def preparar_items(solicitados):
@@ -193,6 +216,9 @@ def registrar_venta(usuario, clave, datos):
     """Registra una venta o recupera la operación original de la misma clave."""
     if not usuario.is_authenticated or not usuario.has_perm(PERMISO_REGISTRAR_VENTA):
         raise PermissionDenied
+    fiada = isinstance(datos, dict) and datos.get("metodo_pago") == "credito"
+    if fiada and not usuario.has_perm(REGISTRAR_FIADO):
+        raise PermissionDenied
     clave = normalizar_clave(clave)
     datos = normalizar_venta(datos)
     huella = hashlib.sha256(
@@ -226,8 +252,13 @@ def registrar_venta(usuario, clave, datos):
                 else sum(i.subtotal for i in items)
             )
             entero_positivo(total, "total", MAX_MONTO)
-            recibido, cambio = validar_pago(
-                datos["metodo_pago"], datos["monto_recibido"], total
+            cliente = (
+                validar_cliente_fiado(datos["cliente_id"], total) if fiada else None
+            )
+            recibido, cambio = (
+                (0, 0)
+                if fiada
+                else validar_pago(datos["metodo_pago"], datos["monto_recibido"], total)
             )
             venta = Venta.objects.create(
                 usuario=usuario,
@@ -238,15 +269,18 @@ def registrar_venta(usuario, clave, datos):
                 metodo_pago=datos["metodo_pago"],
                 monto_recibido=recibido,
                 cambio=cambio,
+                es_credito=fiada,
+                cliente=cliente,
             )
             if items:
                 for item in items:
                     item.venta = venta
                 ItemVenta.objects.bulk_create(items)
+            cuenta_id = crear_deuda(venta, datos).pk if fiada else None
             registro.venta = venta
             registro.save(update_fields=["venta"])
             invalidar_resumen(sesion_id)
-            return ResultadoRegistroVenta(venta, items)
+            return ResultadoRegistroVenta(venta, items, cuenta_id=cuenta_id)
     except IntegrityError:
         if reserva_creada:
             raise
@@ -270,4 +304,5 @@ def registrar_venta(usuario, clave, datos):
             if venta.modalidad == Venta.Modalidad.DETALLADA
             else []
         )
-        return ResultadoRegistroVenta(venta, items, repetida=True)
+        cuenta_id = venta.cuenta_por_cobrar.get(fiado_seguro=True).pk if fiada else None
+        return ResultadoRegistroVenta(venta, items, repetida=True, cuenta_id=cuenta_id)

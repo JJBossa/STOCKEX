@@ -242,6 +242,21 @@ def test_asociacion_de_dos_vendedores_totales_e_inventario(
         },
         "cantidad_anulada": 1,
         "monto_anulado": 700,
+        "fiados": {"cantidad": 0, "importe": 0},
+        "ventas_directas": {"cantidad": 3, "importe": 11700},
+        "abonos": {
+            "cantidad": 0,
+            "importe": 0,
+            "por_metodo": {
+                metodo: {"cantidad": 0, "importe": 0}
+                for metodo in ("efectivo", "tarjeta", "transferencia")
+            },
+        },
+        "recibido_por_metodo": {
+            "efectivo": {"ventas_directas": 900, "abonos": 0, "total": 900},
+            "tarjeta": {"ventas_directas": 10000, "abonos": 0, "total": 10000},
+            "transferencia": {"ventas_directas": 800, "abonos": 0, "total": 800},
+        },
         "ingresos": 250,
         "retiros": 200,
         "cantidad_ingresos": 1,
@@ -627,6 +642,7 @@ def test_migracion_0021_avance_reversion_y_reaplicacion(admin_user):
     anterior = [("inventario", "0020_anulacion_segura_ventas")]
     actual = [("inventario", "0021_nucleo_cierres_caja")]
     ejecutor = MigrationExecutor(connection)
+    esquema_final = ejecutor.loader.graph.leaf_nodes()
     apps_anteriores = ejecutor.loader.project_state(anterior).apps
     Venta0020 = apps_anteriores.get_model("inventario", "Venta")
     Anulacion0020 = apps_anteriores.get_model("inventario", "AnulacionVenta")
@@ -656,6 +672,7 @@ def test_migracion_0021_avance_reversion_y_reaplicacion(admin_user):
         permisos = Group.objects.get(name="Administrador").permissions
         assert permisos.filter(content_type__model="sesioncaja").count() == 5
 
+        MigrationExecutor(connection).migrate(esquema_final)
         sesion = abrir(admin_user)
         nueva = rapida(admin_user)
         movimiento(admin_user, sesion)
@@ -677,4 +694,4 @@ def test_migracion_0021_avance_reversion_y_reaplicacion(admin_user):
             AnulacionVenta.objects.values().get(pk=auditoria.pk) == anulacion_guardada
         )
     finally:
-        MigrationExecutor(connection).migrate(actual)
+        MigrationExecutor(connection).migrate(esquema_final)

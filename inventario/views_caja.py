@@ -23,9 +23,19 @@ METODOS = dict(Venta.METODO_PAGO_CHOICES)
 
 def pagos_resumen(resumen):
     return [
-        (METODOS[metodo], pago)
+        (METODOS.get(metodo, "Otros históricos"), pago)
         for metodo, pago in resumen["por_metodo"].items()
         if metodo not in {"credito", "mixto"} or pago["cantidad"]
+    ]
+
+
+def recibido_resumen(resumen):
+    abonos = resumen.get("abonos")
+    if abonos is None:
+        return []
+    return [
+        (METODOS[metodo], valores, abonos["por_metodo"][metodo])
+        for metodo, valores in resumen["recibido_por_metodo"].items()
     ]
 
 
@@ -35,6 +45,7 @@ def contexto_cierre(sesion):
         "sesion": sesion,
         "resumen": resumen,
         "pagos": pagos_resumen(resumen),
+        "recibido": recibido_resumen(resumen),
         "clasificacion": CLASIFICACIONES[resumen["clasificacion"]],
     }
 

@@ -1,94 +1,107 @@
 """
 Vistas para gestión de cuentas por cobrar
 """
+
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Q, Sum
 from django.core.paginator import Paginator
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_safe
+from .fiados import CONSULTAR_CUENTAS
+from .historial_ventas import SANTIAGO
 from .models import CuentaPorCobrar
 from .utils import es_administrador
 from .access import operaciones_financieras_suspendidas, permiso_requerido
 
 
-@permiso_requerido('inventario.view_cuentaporcobrar')
+@never_cache
+@permiso_requerido(CONSULTAR_CUENTAS)
+@require_safe
 def listar_cuentas_cobrar(request):
     """Lista todas las cuentas por cobrar"""
-    cuentas = CuentaPorCobrar.objects.all().select_related('cliente', 'venta')
-    
+    cuentas = CuentaPorCobrar.objects.all().select_related("cliente", "venta")
+
     # Filtros
-    estado = request.GET.get('estado', '')
+    estado = request.GET.get("estado", "")
     if estado:
         cuentas = cuentas.filter(estado=estado)
-    
-    cliente_id = request.GET.get('cliente', '')
+
+    cliente_id = request.GET.get("cliente", "")
     if cliente_id:
         cuentas = cuentas.filter(cliente_id=cliente_id)
-    
-    vencidas = request.GET.get('vencidas', '')
-    if vencidas == '1':
-        hoy = timezone.now().date()
+
+    vencidas = request.GET.get("vencidas", "")
+    if vencidas == "1":
+        hoy = timezone.localdate(timezone=SANTIAGO)
         cuentas = cuentas.filter(
-            fecha_vencimiento__lt=hoy,
-            estado__in=['pendiente', 'parcial']
+            fecha_vencimiento__lt=hoy, estado__in=CuentaPorCobrar.ESTADOS_PENDIENTES
         )
-    
+
     # Búsqueda
-    query = request.GET.get('q', '').strip()
+    query = request.GET.get("q", "").strip()
     if query:
         cuentas = cuentas.filter(
-            Q(numero_documento__icontains=query) |
-            Q(cliente__nombre__icontains=query) |
-            Q(cliente__rut__icontains=query)
+            Q(numero_documento__icontains=query)
+            | Q(cliente__nombre__icontains=query)
+            | Q(cliente__rut__icontains=query)
         )
-    
+
     # Ordenamiento
-    orden = request.GET.get('orden', '-fecha_emision')
+    orden = request.GET.get("orden", "-fecha_emision")
     cuentas = cuentas.order_by(orden)
-    
+
     # Paginación
     paginator = Paginator(cuentas, 20)
-    page_number = request.GET.get('page')
+    page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
-    
+
     # Estadísticas
-    total_pendiente = cuentas.filter(estado__in=['pendiente', 'parcial']).aggregate(
-        total=Sum('monto_total') - Sum('monto_pagado')
-    )['total'] or 0
-    
+    total_pendiente = (
+        cuentas.filter(estado__in=CuentaPorCobrar.ESTADOS_PENDIENTES).aggregate(
+            total=Sum("monto_total") - Sum("monto_pagado")
+        )["total"]
+        or 0
+    )
+
     context = {
-        'cuentas': page_obj,
-        'query': query,
-        'estado': estado,
-        'cliente_id': cliente_id,
-        'vencidas': vencidas,
-        'orden': orden,
-        'total_pendiente': max(0, total_pendiente),
-        'es_admin': es_administrador(request.user),
+        "cuentas": page_obj,
+        "query": query,
+        "estado": estado,
+        "cliente_id": cliente_id,
+        "vencidas": vencidas,
+        "orden": orden,
+        "total_pendiente": total_pendiente,
+        "es_admin": es_administrador(request.user),
     }
-    
-    return render(request, 'inventario/listar_cuentas_cobrar.html', context)
+
+    return render(request, "inventario/listar_cuentas_cobrar.html", context)
 
 
-@permiso_requerido('inventario.view_cuentaporcobrar')
+@never_cache
+@permiso_requerido(CONSULTAR_CUENTAS)
+@require_safe
 def detalle_cuenta_cobrar(request, cuenta_id):
     """Detalle de una cuenta por cobrar con pagos"""
-    cuenta = get_object_or_404(CuentaPorCobrar.objects.select_related('cliente', 'venta'), id=cuenta_id)
-    pagos = cuenta.pagos.all().order_by('-fecha_pago')
-    
+    cuenta = get_object_or_404(
+        CuentaPorCobrar.objects.select_related("cliente", "venta"), id=cuenta_id
+    )
+    pagos = cuenta.pagos.all().order_by("-fecha_pago")
+
     context = {
-        'cuenta': cuenta,
-        'pagos': pagos,
-        'es_admin': es_administrador(request.user),
+        "cuenta": cuenta,
+        "pagos": pagos,
+        "es_admin": es_administrador(request.user),
     }
-    
-    return render(request, 'inventario/detalle_cuenta_cobrar.html', context)
+
+    return render(request, "inventario/detalle_cuenta_cobrar.html", context)
 
 
-@permiso_requerido('inventario.add_pagocliente')
+@permiso_requerido("inventario.add_pagocliente")
 def registrar_pago(request, cuenta_id):
     return operaciones_financieras_suspendidas()
 
 
-@permiso_requerido('inventario.add_cuentaporcobrar')
+@permiso_requerido("inventario.add_cuentaporcobrar")
 def crear_cuenta_cobrar(request, cliente_id=None):
     return operaciones_financieras_suspendidas()

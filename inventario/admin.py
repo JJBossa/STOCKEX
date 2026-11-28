@@ -1,7 +1,13 @@
+from functools import wraps
+
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
+from django.http import HttpResponse
 from django.utils.html import format_html
+from .caja import ErrorCaja, transaccion_caja
+from .fiados import CONSULTAR_CUENTAS, validar_limite_credito
 from .utils import es_administrador
 from .models import (
     Producto, Categoria, HistorialCambio, Factura, ItemFactura, Proveedor, 
@@ -265,80 +271,184 @@ class NotificacionStockAdmin(admin.ModelAdmin):
     actions = [mark_as_viewed]
 
 
+class ClienteAdminForm(forms.ModelForm):
+    def clean_limite_credito(self):
+        limite = self.cleaned_data["limite_credito"]
+        try:
+            validar_limite_credito(self.instance, limite)
+        except ErrorCaja as error:
+            raise forms.ValidationError(error.datos["mensaje"]) from error
+        return limite
+
+
+def bloquear_cambios_cliente(vista):
+    @wraps(vista)
+    def protegido(self, request, *args, **kwargs):
+        if request.method != "POST":
+            return vista(self, request, *args, **kwargs)
+        try:
+            with transaccion_caja():
+                return vista(self, request, *args, **kwargs)
+        except ErrorCaja as error:
+            return HttpResponse(
+                error.datos["mensaje"],
+                status=error.estado,
+                headers={"Retry-After": "1"},
+            )
+
+    return protegido
+
+
 @admin.register(Cliente)
-class ClienteAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'rut', 'tipo_cliente', 'email', 'telefono', 'limite_credito', 'total_compras_display', 'saldo_pendiente_display', 'activo', 'fecha_registro')
-    list_filter = ('tipo_cliente', 'activo', 'fecha_registro')
-    search_fields = ('nombre', 'rut', 'email', 'telefono')
-    readonly_fields = ('fecha_registro', 'total_compras', 'cantidad_ventas', 'saldo_pendiente')
-    fieldsets = (
-        ('Información del Cliente', {
-            'fields': ('nombre', 'rut', 'tipo_cliente', 'activo')
-        }),
-        ('Contacto', {
-            'fields': ('email', 'telefono', 'direccion', 'contacto')
-        }),
-        ('Crédito', {
-            'fields': ('limite_credito',)
-        }),
-        ('Estadísticas', {
-            'fields': ('total_compras', 'cantidad_ventas', 'saldo_pendiente'),
-            'classes': ('collapse',)
-        }),
-        ('Notas', {
-            'fields': ('notas',)
-        }),
+class ClienteAdmin(CambiosSoloAdministrador, admin.ModelAdmin):
+    form = ClienteAdminForm
+
+    def has_view_permission(self, request, obj=None):
+        return es_administrador(request.user) and super().has_view_permission(
+            request, obj
+        )
+
+    @bloquear_cambios_cliente
+    def changeform_view(self, request, *args, **kwargs):
+        return super().changeform_view(request, *args, **kwargs)
+
+    @bloquear_cambios_cliente
+    def delete_view(self, request, *args, **kwargs):
+        return super().delete_view(request, *args, **kwargs)
+
+    @bloquear_cambios_cliente
+    def changelist_view(self, request, *args, **kwargs):
+        return super().changelist_view(request, *args, **kwargs)
+
+    list_display = (
+        "nombre",
+        "rut",
+        "tipo_cliente",
+        "email",
+        "telefono",
+        "limite_credito",
+        "total_compras_display",
+        "saldo_pendiente_display",
+        "activo",
+        "fecha_registro",
     )
-    
+    list_filter = ("tipo_cliente", "activo", "fecha_registro")
+    search_fields = ("nombre", "rut", "email", "telefono")
+    readonly_fields = (
+        "fecha_registro",
+        "total_compras",
+        "cantidad_ventas",
+        "saldo_pendiente",
+    )
+    fieldsets = (
+        (
+            "Información del Cliente",
+            {"fields": ("nombre", "rut", "tipo_cliente", "activo")},
+        ),
+        ("Contacto", {"fields": ("email", "telefono", "direccion", "contacto")}),
+        ("Crédito", {"fields": ("limite_credito",)}),
+        (
+            "Estadísticas",
+            {
+                "fields": ("total_compras", "cantidad_ventas", "saldo_pendiente"),
+                "classes": ("collapse",),
+            },
+        ),
+        ("Notas", {"fields": ("notas",)}),
+    )
+
     def total_compras_display(self, obj):
         return f"${obj.total_compras:,.0f}"
+
     total_compras_display.short_description = "Total Compras"
-    
+
     def saldo_pendiente_display(self, obj):
         saldo = obj.saldo_pendiente
         if saldo > 0:
-            return format_html('<span style="color: red;">${:,.0f}</span>', saldo)
+            return format_html('<span style="color: red;">{}</span>', f"${saldo:,.0f}")
         return f"${saldo:,.0f}"
+
     saldo_pendiente_display.short_description = "Saldo Pendiente"
 
 
-class PagoClienteInline(HistorialFinancieroSoloLectura, admin.TabularInline):
+class DeudaSoloLectura(HistorialFinancieroSoloLectura):
+    def has_view_permission(self, request, obj=None):
+        return request.user.has_perm(CONSULTAR_CUENTAS) and super().has_view_permission(
+            request, obj
+        )
+
+
+class PagoClienteInline(DeudaSoloLectura, admin.TabularInline):
     model = PagoCliente
     extra = 0
-    readonly_fields = ('fecha_registro',)
-    fields = ('monto', 'fecha_pago', 'metodo_pago', 'referencia', 'notas', 'usuario', 'fecha_registro')
+    readonly_fields = ("fecha_registro",)
+    fields = (
+        "monto",
+        "fecha_pago",
+        "metodo_pago",
+        "referencia",
+        "notas",
+        "usuario",
+        "fecha_registro",
+    )
 
 
 @admin.register(CuentaPorCobrar)
-class CuentaPorCobrarAdmin(HistorialFinancieroSoloLectura, admin.ModelAdmin):
-    list_display = ('numero_documento', 'cliente', 'monto_total', 'monto_pagado', 'saldo_pendiente_display', 'fecha_vencimiento', 'estado', 'esta_vencida_display')
-    list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
-    search_fields = ('numero_documento', 'cliente__nombre', 'cliente__rut')
-    readonly_fields = ('numero_documento', 'fecha_creacion', 'saldo_pendiente', 'esta_vencida')
+class CuentaPorCobrarAdmin(DeudaSoloLectura, admin.ModelAdmin):
+    list_display = (
+        "numero_documento",
+        "cliente",
+        "monto_total",
+        "monto_pagado",
+        "saldo_pendiente_display",
+        "fecha_vencimiento",
+        "estado",
+        "esta_vencida_display",
+    )
+    list_filter = ("estado", "fecha_emision", "fecha_vencimiento")
+    search_fields = ("numero_documento", "cliente__nombre", "cliente__rut")
+    readonly_fields = (
+        "numero_documento",
+        "fecha_creacion",
+        "saldo_pendiente",
+        "esta_vencida",
+    )
     inlines = [PagoClienteInline]
-    date_hierarchy = 'fecha_emision'
-    
+    date_hierarchy = "fecha_emision"
+
     def saldo_pendiente_display(self, obj):
         saldo = obj.saldo_pendiente
         if saldo > 0:
-            return format_html('<span style="color: red;">${:,.0f}</span>', saldo)
+            return format_html('<span style="color: red;">{}</span>', f"${saldo:,.0f}")
         return f"${saldo:,.0f}"
+
     saldo_pendiente_display.short_description = "Saldo Pendiente"
-    
+
     def esta_vencida_display(self, obj):
         if obj.esta_vencida:
-            return format_html('<span style="color: red;">⚠️ Vencida</span>')
+            return format_html('<span style="color: red;">{}</span>', "⚠️ Vencida")
         return "✓"
+
     esta_vencida_display.short_description = "Estado"
 
 
 @admin.register(PagoCliente)
-class PagoClienteAdmin(HistorialFinancieroSoloLectura, admin.ModelAdmin):
-    list_display = ('cuenta_por_cobrar', 'monto', 'fecha_pago', 'metodo_pago', 'usuario', 'fecha_registro')
-    list_filter = ('metodo_pago', 'fecha_pago', 'fecha_registro')
-    search_fields = ('cuenta_por_cobrar__numero_documento', 'cuenta_por_cobrar__cliente__nombre')
-    readonly_fields = ('fecha_registro',)
-    date_hierarchy = 'fecha_pago'
+class PagoClienteAdmin(DeudaSoloLectura, admin.ModelAdmin):
+    list_display = (
+        "cuenta_por_cobrar",
+        "monto",
+        "fecha_pago",
+        "metodo_pago",
+        "usuario",
+        "fecha_registro",
+    )
+    list_filter = ("metodo_pago", "fecha_pago", "fecha_registro")
+    search_fields = (
+        "cuenta_por_cobrar__numero_documento",
+        "cuenta_por_cobrar__cliente__nombre",
+    )
+    readonly_fields = ("fecha_registro",)
+    date_hierarchy = "fecha_pago"
 
 
 @admin.register(Almacen)

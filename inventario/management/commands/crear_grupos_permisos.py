@@ -28,6 +28,9 @@ ADMINISTRADOR["inventario"].update(
         "registrar_movimiento_caja",
         "cerrar_caja",
         "consultar_cierres_caja",
+        "registrar_venta_fiada",
+        "consultar_cuentas_por_cobrar",
+        "registrar_abono",
     }
 )
 
