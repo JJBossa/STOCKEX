@@ -12,6 +12,8 @@ from django.utils import timezone
 from django.http import JsonResponse
 from django.db.models import CharField
 from django.db.models.functions import Lower, Replace
+from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from datetime import timedelta
@@ -135,27 +137,44 @@ def eliminar_producto(request, producto_id):
     
     if request.method == 'POST':
         nombre_producto = producto.nombre
+        try:
+            with transaction.atomic():
+                registrar_cambio(
+                    producto,
+                    request.user,
+                    "eliminar",
+                    descripcion=f"Producto eliminado: {nombre_producto}",
+                )
+                producto.delete()
+        except ProtectedError:
+            messages.error(
+                request, "No se puede eliminar un producto con ventas asociadas."
+            )
+            return redirect("inicio")
         # Eliminar imagen si existe
         if producto.imagen:
             try:
                 import os
                 from django.conf import settings
+
                 image_path = settings.MEDIA_ROOT / producto.imagen.name
                 if image_path.exists():
                     os.remove(image_path)
             except:
                 pass
-        
-        # Registrar eliminación antes de borrar
-        registrar_cambio(producto, request.user, 'eliminar', descripcion=f'Producto eliminado: {nombre_producto}')
-        producto.delete()
-        messages.success(request, f'Producto "{nombre_producto}" eliminado exitosamente.')
-        return redirect('inicio')
-    
-    return render(request, 'inventario/eliminar_producto.html', {
-        'producto': producto,
-        'es_admin': True,
-    })
+        messages.success(
+            request, f'Producto "{nombre_producto}" eliminado exitosamente.'
+        )
+        return redirect("inicio")
+
+    return render(
+        request,
+        "inventario/eliminar_producto.html",
+        {
+            "producto": producto,
+            "es_admin": True,
+        },
+    )
 
 @login_required
 def inicio(request):
@@ -383,7 +402,7 @@ def actualizar_stock_rapido(request, producto_id):
             stock_anterior=stock_anterior,
             stock_nuevo=nuevo_stock,
             usuario=request.user,
-            notas=f'Actualización rápida: {accion} {cantidad if accion != "set" else ""}'
+            notas=f'Actualización rápida: {accion} {cantidad if accion != "set" else ""}',
         )
         
         # Registrar cambio
@@ -394,17 +413,19 @@ def actualizar_stock_rapido(request, producto_id):
             'stock', 
             stock_anterior, 
             nuevo_stock,
-            f'Stock actualizado rápidamente: {accion} {cantidad if accion != "set" else ""}'
+            f'Stock actualizado rápidamente: {accion} {cantidad if accion != "set" else ""}',
         )
-        
-        return JsonResponse({
-            'success': True,
-            'nuevo_stock': nuevo_stock,
-            'stock_anterior': stock_anterior,
-            'stock_minimo': producto.stock_minimo,
-            'stock_bajo': producto.stock_bajo,
-            'mensaje': f'Stock actualizado: {stock_anterior} → {nuevo_stock}'
-        })
+
+        return JsonResponse(
+            {
+                "success": True,
+                "nuevo_stock": nuevo_stock,
+                "stock_anterior": stock_anterior,
+                "stock_minimo": producto.stock_minimo,
+                "stock_bajo": producto.stock_bajo,
+                "mensaje": f"Stock actualizado: {stock_anterior} → {nuevo_stock}",
+            }
+        )
     except ValueError:
         return JsonResponse({'error': 'Cantidad inválida. Debe ser un número.'}, status=400)
     except Exception as e:

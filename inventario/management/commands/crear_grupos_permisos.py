@@ -4,7 +4,7 @@ from django.db import transaction
 
 
 VENDEDOR = {
-    'inventario': {'view_producto', 'view_categoria', 'view_venta'},
+    "inventario": {"view_producto", "view_categoria", "view_venta", "registrar_venta"},
 }
 ADMINISTRADOR = {
     'auth': {'view_user', 'add_user', 'change_user'},

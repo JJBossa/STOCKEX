@@ -362,6 +362,11 @@ class ProductoFavorito(models.Model):
 
 class Venta(models.Model):
     """Modelo para registrar ventas del punto de venta"""
+
+    class Modalidad(models.TextChoices):
+        RAPIDA = "rapida", "Rápida"
+        DETALLADA = "detallada", "Detallada"
+
     METODO_PAGO_CHOICES = [
         ('efectivo', 'Efectivo'),
         ('tarjeta', 'Tarjeta'),
@@ -369,10 +374,24 @@ class Venta(models.Model):
         ('credito', 'Crédito'),
         ('mixto', 'Mixto'),
     ]
-    
-    numero_venta = models.CharField(max_length=50, unique=True, verbose_name="Número de Venta")
-    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, related_name='ventas', verbose_name="Cliente")
-    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Vendedor")
+
+    numero_venta = models.CharField(
+        max_length=50, unique=True, verbose_name="Número de Venta"
+    )
+    modalidad = models.CharField(
+        max_length=10, choices=Modalidad.choices, null=True, blank=True
+    )
+    cliente = models.ForeignKey(
+        "Cliente",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ventas",
+        verbose_name="Cliente",
+    )
+    usuario = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, verbose_name="Vendedor"
+    )
     fecha = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Venta")
     subtotal = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Subtotal")
     descuento = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name="Descuento")
@@ -388,28 +407,43 @@ class Venta(models.Model):
         verbose_name = "Venta"
         verbose_name_plural = "Ventas"
         ordering = ['-fecha']
+        permissions = [("registrar_venta", "Puede registrar ventas de punto de venta")]
 
     def __str__(self):
         return f"Venta #{self.numero_venta} - ${self.total:,.0f} - {self.fecha.strftime('%d/%m/%Y %H:%M')}"
     
     def save(self, *args, **kwargs):
         if not self.numero_venta:
-            # Generar número de venta único
-            from datetime import datetime
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            self.numero_venta = f"V-{timestamp}"
+            self.numero_venta = f"V-{uuid.uuid4().hex}"
         super().save(*args, **kwargs)
 
 class ItemVenta(models.Model):
     """Items de una venta"""
-    venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='items', verbose_name="Venta")
-    producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, verbose_name="Producto")
-    nombre_producto = models.CharField(max_length=200, verbose_name="Nombre del Producto")
-    cantidad = models.IntegerField(default=1, validators=[MinValueValidator(1)], verbose_name="Cantidad")
-    precio_unitario = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Precio Unitario")
-    subtotal = models.DecimalField(max_digits=10, decimal_places=0, default=0, verbose_name="Subtotal")
-    stock_anterior = models.IntegerField(default=0, verbose_name="Stock Anterior")
-    stock_despues = models.IntegerField(default=0, verbose_name="Stock Después")
+
+    venta = models.ForeignKey(
+        Venta, on_delete=models.CASCADE, related_name="items", verbose_name="Venta"
+    )
+    producto = models.ForeignKey(
+        Producto, on_delete=models.PROTECT, null=True, verbose_name="Producto"
+    )
+    nombre_producto = models.CharField(
+        max_length=200, verbose_name="Nombre del Producto"
+    )
+    cantidad = models.IntegerField(
+        default=1, validators=[MinValueValidator(1)], verbose_name="Cantidad"
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=10, decimal_places=0, default=0, verbose_name="Precio Unitario"
+    )
+    subtotal = models.DecimalField(
+        max_digits=10, decimal_places=0, default=0, verbose_name="Subtotal"
+    )
+    stock_anterior = models.IntegerField(
+        null=True, blank=True, verbose_name="Stock Anterior"
+    )
+    stock_despues = models.IntegerField(
+        null=True, blank=True, verbose_name="Stock Después"
+    )
 
     class Meta:
         verbose_name = "Item de Venta"
@@ -423,6 +457,23 @@ class ItemVenta(models.Model):
         # Calcular subtotal automáticamente
         self.subtotal = self.cantidad * self.precio_unitario
         super().save(*args, **kwargs)
+
+
+class RegistroVenta(models.Model):
+    """Reserva transaccional de una clave de idempotencia por vendedor."""
+
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    clave = models.UUIDField()
+    huella = models.CharField(max_length=64)
+    venta = models.OneToOneField(Venta, on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "clave"], name="venta_clave_unica_por_usuario"
+            )
+        ]
+
 
 class Cotizacion(models.Model):
     """Modelo para cotizaciones a clientes"""

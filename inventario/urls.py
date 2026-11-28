@@ -1,6 +1,7 @@
 from django.urls import path
 from .views_catalogo import catalogo_productos
 from .views_importacion_productos import importar_productos_excel
+from .views_registro_ventas import registrar_venta_pos
 from . import views
 from . import views_extra
 from . import views_facturas
@@ -30,6 +31,7 @@ from . import views_reportes_programados
 
 urlpatterns = [
     path("api/catalogo-productos/", catalogo_productos, name="catalogo_productos"),
+    path("pos/registrar-venta/", registrar_venta_pos, name="registrar_venta_pos"),
     path(
         "productos/importar-excel/",
         importar_productos_excel,
