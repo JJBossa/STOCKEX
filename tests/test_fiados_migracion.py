@@ -18,6 +18,7 @@ def test_0022_conserva_historia_y_protege_reversion(admin_user, client):
     anterior = [("inventario", "0021_nucleo_cierres_caja")]
     nueva = [("inventario", "0022_nucleo_fiados_abonos")]
     ejecutor = MigrationExecutor(connection)
+    esquema_final = ejecutor.loader.graph.leaf_nodes()
     ejecutor.migrate(anterior)
     apps = ejecutor.loader.project_state(anterior).apps
     ClienteAnterior = apps.get_model("inventario", "Cliente")
@@ -120,7 +121,7 @@ def test_0022_conserva_historia_y_protege_reversion(admin_user, client):
             modelo.objects.values().get(pk=pk) for modelo, pk in zip(modelos, pks)
         ]
 
-        MigrationExecutor(connection).migrate(nueva)
+        MigrationExecutor(connection).migrate(esquema_final)
         from inventario.models import Cliente
 
         abierto = abrir(admin_user)
@@ -132,4 +133,4 @@ def test_0022_conserva_historia_y_protege_reversion(admin_user, client):
         assert PagoCliente.objects.get(pk=confirmado.pk).sesion_caja_id == abierto.pk
         assert SesionCaja.objects.get(pk=cerrada.pk).resumen_cierre == esperado
     finally:
-        MigrationExecutor(connection).migrate(nueva)
+        MigrationExecutor(connection).migrate(esquema_final)

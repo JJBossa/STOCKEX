@@ -5,7 +5,7 @@ const enteroCL = new Intl.NumberFormat("es-CL");
 const fechaCL = new Intl.DateTimeFormat("es-CL", {
     dateStyle: "medium", timeStyle: "short", timeZone: "America/Santiago",
 });
-const metodos = new Map([["efectivo", "Efectivo"], ["tarjeta", "Tarjeta"], ["transferencia", "Transferencia"]]);
+const metodos = new Map([["efectivo", "Efectivo"], ["tarjeta", "Tarjeta"], ["transferencia", "Transferencia"], ["credito", "Fiado"]]);
 const MAX_MONTO = 999_999_999_999;
 const MAX_SUBTOTAL = 9_999_999_999;
 const MAX_LINEAS = 100;
@@ -16,7 +16,9 @@ const rechazosDefinitivos = new Map([
         "json_invalido", "entero_invalido", "clave_invalida", "items_invalidos", "item_invalido",
         "producto_duplicado", "modalidad_invalida", "campos_invalidos", "metodo_pago_invalido",
         "efectivo_insuficiente", "monto_pago_inexacto",
+        "fecha_invalida", "texto_invalido", "abono_inicial_invalido",
     ])],
+    [409, new Set(["cliente_no_elegible", "limite_credito_excedido", "cuenta_inconsistente"])],
     [413, new Set(["payload_demasiado_grande"])],
     [415, new Set(["tipo_de_contenido_invalido"])],
 ]);
@@ -39,7 +41,11 @@ function subtotalLinea(linea, precio = linea.precio) {
 
 function datosRecuperables(datos) {
     if (!datos || !metodos.has(datos.metodo_pago)) return false;
-    if ("monto_recibido" in datos && !enteroPositivo(datos.monto_recibido, MAX_MONTO)) return false;
+    if (datos.metodo_pago === "credito") {
+        if (!enteroPositivo(datos.cliente_id, Number.MAX_SAFE_INTEGER)
+            || (datos.fecha_vencimiento !== null && (typeof datos.fecha_vencimiento !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(datos.fecha_vencimiento)))
+            || typeof datos.notas !== "string" || ("monto_recibido" in datos && datos.monto_recibido !== 0)) return false;
+    } else if ("monto_recibido" in datos && !enteroPositivo(datos.monto_recibido, MAX_MONTO)) return false;
     if (datos.modalidad === "rapida") return enteroPositivo(datos.monto, MAX_MONTO);
     return datos.modalidad === "detallada" && Array.isArray(datos.items)
         && datos.items.length > 0 && datos.items.length <= MAX_LINEAS
@@ -49,11 +55,19 @@ function datosRecuperables(datos) {
 }
 
 function confirmacionValida(venta, status, usuario, solicitud) {
-    return venta && String(venta.usuario_id) === usuario && venta.modalidad === solicitud.modalidad
+    const coincide = venta && String(venta.usuario_id) === usuario && venta.modalidad === solicitud.modalidad
         && venta.metodo_pago === solicitud.metodo_pago && venta.repetida === (status === 200)
         && typeof venta.numero_venta === "string" && venta.numero_venta.length > 0
         && typeof venta.fecha === "string" && Number.isFinite(Date.parse(venta.fecha))
-        && enteroPositivo(venta.total, MAX_MONTO) && enteroPositivo(venta.monto_recibido, MAX_MONTO)
+        && enteroPositivo(venta.total, MAX_MONTO);
+    if (!coincide) return false;
+    if (solicitud.metodo_pago === "credito") {
+        const total = solicitud.monto ?? solicitud.items.reduce((suma, item) => suma + item.precio_visto * item.cantidad, 0);
+        return enteroPositivo(venta.id, Number.MAX_SAFE_INTEGER) && venta.total === total && venta.es_credito === true
+            && venta.cliente_id === solicitud.cliente_id && enteroPositivo(venta.cuenta_id, Number.MAX_SAFE_INTEGER)
+            && enteroPositivo(venta.sesion_caja_id, Number.MAX_SAFE_INTEGER) && venta.monto_recibido === 0 && venta.cambio === 0;
+    }
+    return enteroPositivo(venta.monto_recibido, MAX_MONTO)
         && Number.isSafeInteger(venta.cambio) && venta.cambio >= 0 && venta.cambio <= MAX_MONTO;
 }
 
@@ -72,8 +86,10 @@ function montarPuntoVenta(raiz) {
     const componenteBusqueda = bloqueBusqueda.querySelector("[data-buscador-productos]");
     const consulta = componenteBusqueda.querySelector("[data-consulta]");
     const usuario = raiz.dataset.usuario;
+    const panelFiado = elemento("fiado");
     const almacenamiento = `stockex.pos.pendiente.v1.${usuario}`;
     let buscador, cargaBuscador;
+    let fiado, cargaFiado, restauracionFiado;
     let pendiente = null, claveEdicion = null, preciosNuevos = null;
     let enviando = false, revisarClave = false;
     let cajaAbierta = raiz.dataset.cajaAbierta === "true";
@@ -109,6 +125,13 @@ function montarPuntoVenta(raiz) {
         const vuelto = elemento("vuelto");
         elemento("total").textContent = total === null && modalidad() === "detallada" ? "—" : moneda.format(total ?? 0);
         elemento("caja").hidden = !caja;
+        if (panelFiado) {
+            panelFiado.hidden = metodo() !== "credito";
+            if (!panelFiado.hidden) {
+                cargarFiado();
+                fiado?.actualizar(total);
+            } else fiado?.cancelarBusqueda();
+        }
         vuelto.textContent = diferencia === null ? "—"
             : diferencia < 0 ? `Faltan ${moneda.format(-diferencia)}` : moneda.format(diferencia);
         vuelto.parentElement.classList.toggle("invalido", diferencia < 0);
@@ -161,6 +184,18 @@ function montarPuntoVenta(raiz) {
                 "No se pudo cargar el buscador. Vuelve a abrir el punto de venta.";
             elemento("sesion").hidden = false;
             cargaBuscador = null;
+        });
+    }
+
+    function cargarFiado() {
+        if (cargaFiado) return;
+        cargaFiado = import(panelFiado.dataset.modulo).then(({montarFiado}) => {
+            fiado = montarFiado(raiz, usuario);
+            if (restauracionFiado) fiado.restaurar(...restauracionFiado);
+            fiado.actualizar(totalVisual());
+        }).catch(() => {
+            avisar("No se pudo cargar el buscador de clientes. Vuelve a intentar.");
+            cargaFiado = null;
         });
     }
 
@@ -278,6 +313,15 @@ function montarPuntoVenta(raiz) {
             }
         }
         if (!enteroPositivo(total, MAX_MONTO)) return invalidar("El total supera el importe permitido.");
+        if (datos.metodo_pago === "credito") {
+            if (!fiado) {
+                cargarFiado();
+                return invalidar("Espera a que se cargue el buscador de clientes.");
+            }
+            const campos = fiado.campos(invalidar);
+            if (!campos) return null;
+            Object.assign(datos, campos);
+        }
         if (enEfectivo() && recibido.value.trim()) {
             const efectivo = montoCL(recibido.value);
             if (efectivo === null) return invalidar("Ingresa el efectivo recibido como un entero positivo.", recibido);
@@ -290,6 +334,7 @@ function montarPuntoVenta(raiz) {
     function guardarIntento(datos) {
         try {
             const intento = {clave: claveEdicion ?? uuidV4(), cuerpo: JSON.stringify(datos)};
+            if (datos.metodo_pago === "credito") Object.assign(intento, {usuario, cliente: fiado.cliente()});
             sessionStorage.setItem(almacenamiento, JSON.stringify(intento));
             pendiente = intento;
             return true;
@@ -311,10 +356,13 @@ function montarPuntoVenta(raiz) {
             if (!guardado) return;
             const intento = JSON.parse(guardado);
             const datos = JSON.parse(intento.cuerpo);
-            if (!UUID_V4.test(intento.clave) || !datosRecuperables(datos)) throw new Error("Intento inválido");
+            if ((intento.usuario !== undefined && intento.usuario !== usuario)
+                || !UUID_V4.test(intento.clave) || !datosRecuperables(datos)) throw new Error("Intento inválido");
             pendiente = {clave: intento.clave, cuerpo: intento.cuerpo};
             elemento(`modo-${datos.modalidad}`).checked = true;
-            elemento(datos.metodo_pago).checked = true;
+            const controlMetodo = elemento(datos.metodo_pago);
+            if (controlMetodo) controlMetodo.checked = true;
+            if (datos.metodo_pago === "credito") restauracionFiado = [datos, intento.cliente];
             monto.value = datos.monto === undefined ? "" : enteroCL.format(datos.monto);
             recibido.value = datos.monto_recibido === undefined ? "" : enteroCL.format(datos.monto_recibido);
             for (const item of datos.items ?? []) {
@@ -328,6 +376,8 @@ function montarPuntoVenta(raiz) {
 
     function limpiarVenta() {
         claveEdicion = null;
+        restauracionFiado = null;
+        fiado?.limpiar();
         monto.value = recibido.value = consulta.value = "";
         monto.removeAttribute("aria-invalid");
         recibido.removeAttribute("aria-invalid");
@@ -347,6 +397,8 @@ function montarPuntoVenta(raiz) {
         elemento("venta-vuelto").textContent = moneda.format(venta.cambio);
         const efectivo = venta.metodo_pago === "efectivo";
         elemento("venta-efectivo").hidden = elemento("venta-cambio").hidden = !efectivo;
+        elemento("venta-fiada").hidden = venta.metodo_pago !== "credito";
+        elemento("venta-cuenta").textContent = venta.cuenta_id ? `#${venta.cuenta_id}` : "";
         elemento("ultima").hidden = false;
         estado.textContent = venta.repetida ? "Venta recuperada. Ya estaba registrada." : "Venta registrada.";
         limpiarVenta();
@@ -423,16 +475,12 @@ function montarPuntoVenta(raiz) {
         throw new Error("Resultado desconocido");
     }
 
-    formulario.addEventListener("submit", async evento => {
-        evento.preventDefault();
+    async function enviarVenta(datos) {
         if (enviando || revisarClave || preciosNuevos || (!cajaAbierta && !pendiente)) return;
         estado.textContent = "";
         elemento("sesion").hidden = true;
         avisar();
-        if (!pendiente) {
-            const datos = armarDatos();
-            if (!datos || !guardarIntento(datos)) return;
-        }
+        if (!pendiente && (!datos || !guardarIntento(datos))) return;
 
         enviando = true;
         mostrarEstado();
@@ -485,6 +533,18 @@ function montarPuntoVenta(raiz) {
             if (registrada) enfocarEntrada();
             else destino.focus();
         }
+    }
+
+    formulario.addEventListener("submit", evento => {
+        evento.preventDefault();
+        if (enviando || revisarClave || preciosNuevos || (!cajaAbierta && !pendiente)) return;
+        if (pendiente) return enviarVenta();
+        avisar();
+        const datos = armarDatos();
+        if (!datos) return;
+        if (datos.metodo_pago === "credito") {
+            fiado.revisar(datos, totalVisual(), () => enviarVenta(datos));
+        } else enviarVenta(datos);
     });
 
     formulario.addEventListener("keydown", evento => {
@@ -492,7 +552,7 @@ function montarPuntoVenta(raiz) {
         if (evento.key !== "Enter") return;
         const enBusqueda = bloqueBusqueda.contains(evento.target);
         const atajo = evento.ctrlKey && !evento.shiftKey && !evento.altKey && !evento.metaKey;
-        if (!atajo && evento.target.closest("button[type=button]")) return;
+        if (!atajo && evento.target.closest("button[type=button], textarea")) return;
         evento.preventDefault();
         if (atajo && !enBusqueda && !evento.repeat && !evento.isComposing && !bloqueado()) formulario.requestSubmit();
     });

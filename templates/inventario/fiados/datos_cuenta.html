@@ -1,0 +1,21 @@
+{% load ventas_tags %}
+<div id="fiados-datos-cuenta" data-cuenta="{{ registro.pk }}" data-usuario="{{ request.user.pk }}"
+     data-saldo="{% if cuenta.saldo is not None %}{{ cuenta.saldo|stringformat:'d' }}{% endif %}"
+     data-caja="{{ caja_abierta|yesno:'true,false' }}" data-pagable="{{ cuenta_pagable|yesno:'true,false' }}">
+    <dl class="row g-2 mb-2">
+        <div class="col-sm-4"><dt>Monto original</dt><dd>{{ cuenta.monto_total|clp }}</dd></div>
+        <div class="col-sm-4"><dt>Total abonado registrado</dt><dd>{{ cuenta.monto_pagado|clp }}</dd></div>
+        <div class="col-sm-4"><dt>Saldo pendiente</dt><dd>{% if cuenta.saldo is not None %}{{ cuenta.saldo|clp }}{% else %}Por conciliar{% endif %}</dd></div>
+        <div class="col-sm-4"><dt>Emisión</dt><dd>{{ cuenta.fecha_emision|date:"d/m/Y" }}</dd></div>
+        <div class="col-sm-4"><dt>Vencimiento</dt><dd>{{ cuenta.fecha_vencimiento|date:"d/m/Y"|default:"Sin vencimiento" }}</dd></div>
+        <div class="col-sm-4"><dt>Estado</dt><dd>{% include 'inventario/fiados/estado_cuenta.html' %}</dd></div>
+    </dl>
+    {% if venta %}<p>Venta <a href="{% url 'detalle_venta' venta.id %}">{{ venta.numero_venta }}</a></p>{% endif %}
+    {% if registro.notas %}<p class="text-break">Observaciones {{ registro.notas }}</p>{% endif %}
+    {% if cuenta.conciliacion_requerida %}<p class="alert alert-warning">Revisa las diferencias antes de registrar un abono.</p>{% endif %}
+    {% if puede_abonar and not caja_abierta %}
+    <p class="alert alert-warning">Caja cerrada. Solicita una apertura para registrar un abono nuevo.
+        {% if perms.inventario.abrir_caja %}<a href="{% url 'caja_gestion' %}">Ir a Caja</a>{% endif %}
+    </p>
+    {% endif %}
+</div>

@@ -20,6 +20,13 @@ def preparar_datos(*, con_caja=True):
     if not con_caja:
         cuentas.append(("pos-administrador-b", "Administrador"))
         Cliente.objects.create(nombre="Cliente sintético para fiado")
+        Cliente.objects.bulk_create(
+            [
+                Cliente(nombre="Coincidente <em>Cliente</em>"),
+                Cliente(nombre="Coincidente <em>Cliente</em>", rut="11111111-1"),
+                Cliente(nombre="Coincidente inactivo", activo=False),
+            ]
+        )
     for nombre, grupo in cuentas:
         usuario = User.objects.create_user(nombre, password="Prueba-local-STK04B!")
         if grupo:

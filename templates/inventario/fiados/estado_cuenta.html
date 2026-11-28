@@ -1,0 +1,9 @@
+{% if cuenta.conciliacion_requerida %}
+    <strong>Requiere conciliación</strong>
+{% else %}
+    {{ cuenta.estado|capfirst }}
+    {% if cuenta.vencida %} · Vencida{% endif %}
+{% endif %}
+{% if cuenta.estado_registrado != cuenta.estado or cuenta.conciliacion_requerida %}
+    <small class="d-block">Estado registrado {{ cuenta.estado_registrado }}</small>
+{% endif %}

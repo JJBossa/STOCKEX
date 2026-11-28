@@ -605,6 +605,9 @@ class Cliente(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
     notas = models.TextField(blank=True, null=True, verbose_name="Notas")
     
+    clave_alta = models.UUIDField(null=True, unique=True, editable=False)
+    huella_alta = models.CharField(max_length=64, blank=True, editable=False)
+
     class Meta:
         verbose_name = "Cliente"
         verbose_name_plural = "Clientes"

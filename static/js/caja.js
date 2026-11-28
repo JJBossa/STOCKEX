@@ -1,4 +1,4 @@
-import {uuidV4} from "./solicitud-financiera.js";
+import {recortar, uuidV4} from "./solicitud-financiera.js";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idValido = valor => /^[1-9][0-9]{0,18}$/.test(String(valor));
@@ -16,11 +16,6 @@ const rechazos = new Map([
     [413, new Set(["payload_demasiado_grande"])],
     [415, new Set(["tipo_de_contenido_invalido"])],
 ]);
-
-function recortar(valor) {
-    // Los servicios comparan los textos después de aplicar str.strip().
-    return valor.replace(/^[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/gu, "");
-}
 
 function leerImporte(campo, minimo) {
     const texto = campo.value.trim();

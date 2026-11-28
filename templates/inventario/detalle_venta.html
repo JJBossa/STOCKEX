@@ -17,7 +17,7 @@
         <div><dt>Fecha y hora · Chile</dt><dd><time datetime="{{ venta.fecha|date:'c' }}">{{ venta.fecha|date:"d/m/Y H:i" }}</time></dd></div>
         <div><dt>Modalidad</dt><dd>{{ venta.get_modalidad_display|default_if_none:"No registrada" }}</dd></div>
         <div><dt>Vendedor</dt><dd>{{ venta.usuario.username|default:"—" }}</dd></div>
-        <div><dt>Método de pago</dt><dd>{{ venta.get_metodo_pago_display }}</dd></div>
+        <div><dt>Método de pago</dt><dd>{% if venta.metodo_pago == 'credito' %}Fiado{% else %}{{ venta.get_metodo_pago_display }}{% endif %}</dd></div>
         <div><dt>Estado</dt><dd>{% include 'inventario/fragmentos/estado_venta.html' %}</dd></div>
         <div><dt>{% if venta.cancelada %}Total original{% else %}Total{% endif %}</dt><dd class="hist-total-detalle">{{ venta.total|clp }}</dd></div>
         {% if venta.metodo_pago == 'efectivo' or venta.metodo_pago == 'mixto' %}
@@ -52,7 +52,7 @@
                 <div><dt>Número</dt><dd>{{ venta.numero_venta }}</dd></div>
                 <div><dt>Fecha y hora original · Chile</dt><dd>{{ venta.fecha|date:"d/m/Y H:i" }}</dd></div>
                 <div><dt>Importe original</dt><dd>{{ venta.total|clp }}</dd></div>
-                <div><dt>Método de pago</dt><dd>{{ venta.get_metodo_pago_display }}</dd></div>
+                <div><dt>Método de pago</dt><dd>{% if venta.metodo_pago == 'credito' %}Fiado{% else %}{{ venta.get_metodo_pago_display }}{% endif %}</dd></div>
             </dl>
             <label for="motivo-anulacion" class="form-label">Motivo de la anulación</label>
             <textarea id="motivo-anulacion" name="motivo" class="form-control mb-3" rows="3"

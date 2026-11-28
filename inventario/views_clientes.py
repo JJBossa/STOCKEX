@@ -71,57 +71,6 @@ def listar_clientes(request):
     return render(request, "inventario/listar_clientes.html", context)
 
 
-@permiso_requerido("inventario.add_cliente", administrativo=True)
-def crear_cliente(request):
-    """Crear un nuevo cliente"""
-    if request.method == "POST":
-        nombre = request.POST.get("nombre", "").strip()
-        rut = request.POST.get("rut", "").strip() or None
-        tipo_cliente = request.POST.get("tipo_cliente", "natural")
-        email = request.POST.get("email", "").strip() or None
-        telefono = request.POST.get("telefono", "").strip() or None
-        direccion = request.POST.get("direccion", "").strip() or None
-        contacto = request.POST.get("contacto", "").strip() or None
-        limite_credito = request.POST.get("limite_credito", "0") or "0"
-        notas = request.POST.get("notas", "").strip() or None
-
-        if not nombre:
-            messages.error(request, "El nombre es requerido.")
-        else:
-            try:
-                cliente = Cliente.objects.create(
-                    nombre=nombre,
-                    rut=rut,
-                    tipo_cliente=tipo_cliente,
-                    email=email,
-                    telefono=telefono,
-                    direccion=direccion,
-                    contacto=contacto,
-                    limite_credito=Cliente._meta.get_field("limite_credito").clean(
-                        limite_credito, None
-                    ),
-                    notas=notas,
-                )
-                messages.success(
-                    request, f'Cliente "{cliente.nombre}" creado exitosamente.'
-                )
-                return redirect("detalle_cliente", cliente_id=cliente.id)
-            except ValidationError as error:
-                messages.error(request, " ".join(error.messages))
-            except IntegrityError:
-                messages.error(
-                    request, "Revisa que el RUT no esté registrado para otro cliente."
-                )
-
-    return render(
-        request,
-        "inventario/crear_cliente.html",
-        {
-            "es_admin": True,
-        },
-    )
-
-
 @never_cache
 @permiso_requerido("inventario.view_cliente", administrativo=True)
 def detalle_cliente(request, cliente_id):

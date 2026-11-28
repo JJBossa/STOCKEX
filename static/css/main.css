@@ -638,3 +638,12 @@ body .producto-imagen {
     }
 }
 
+
+.stockex-confirmacion:not([open]) { display: none; }
+.stockex-confirmacion {
+    width: min(34rem, calc(100% - 2rem));
+    max-height: calc(100% - 2rem);
+    margin: auto;
+    overflow: auto;
+}
+.stockex-confirmacion::backdrop { background: rgb(0 0 0 / 55%); }

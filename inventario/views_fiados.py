@@ -1,9 +1,11 @@
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import JsonResponse
 
 from . import caja, fiados
+from .access import ventas_visibles
 from .models import Cliente
+from .peticion_financiera import comprobar_cuenta
 from .registro_ventas import PERMISO_REGISTRAR_VENTA
 from .views_caja import cursor_pagina, endpoint_caja, fecha_chile, resultado_json
 
@@ -20,7 +22,7 @@ def cliente_existente(cliente_id):
         ) from error
 
 
-def cuenta_json(cuenta):
+def cuenta_json(cuenta, *, venta_visible=False):
     estado = cuenta.estado
     if estado == "vencido" and not cuenta.inconsistente:
         estado = "parcial" if cuenta.monto_pagado else "pendiente"
@@ -28,7 +30,7 @@ def cuenta_json(cuenta):
         "id": cuenta.pk,
         "numero_documento": cuenta.numero_documento,
         "cliente_id": cuenta.cliente_id,
-        "venta_id": cuenta.venta_id,
+        "venta_id": cuenta.venta_id if venta_visible else None,
         "monto_total": int(cuenta.monto_total),
         "monto_pagado": int(cuenta.monto_pagado),
         "saldo": None if cuenta.inconsistente else int(cuenta.saldo_pendiente),
@@ -60,6 +62,7 @@ def abono_json(abono):
 def buscar_clientes(request):
     if not request.user.has_perm(PERMISO_REGISTRAR_VENTA):
         raise PermissionDenied
+    comprobar_cuenta(request)
     consulta = caja.texto(request.GET.get("q", ""), "q", 0, 100)
     if len(consulta) < 2:
         return JsonResponse({"clientes": []})
@@ -74,6 +77,7 @@ def buscar_clientes(request):
 
 @endpoint_caja(fiados.CONSULTAR_CUENTAS)
 def saldo(request, cliente_id):
+    comprobar_cuenta(request)
     cliente = cliente_existente(cliente_id)
     if cliente.limite_credito < 0:
         raise fiados.error_conciliacion()
@@ -91,17 +95,33 @@ def pendientes(request, cliente_id):
     cliente = cliente_existente(cliente_id)
     cuentas = fiados.cuentas_auditadas(
         cliente.cuentas_por_cobrar.filter(fiados.PENDIENTES)
+    ).annotate(
+        venta_visible=Exists(
+            ventas_visibles(request.user).filter(pk=OuterRef("venta_id"))
+        )
     )
     pagina, cursor = caja.pagina_por_id(cuentas, cursor_pagina(request), LIMITE_PAGINA)
     return JsonResponse(
-        {"cuentas": [cuenta_json(cuenta) for cuenta in pagina], "antes_de": cursor}
+        {
+            "cuentas": [
+                cuenta_json(cuenta, venta_visible=cuenta.venta_visible)
+                for cuenta in pagina
+            ],
+            "antes_de": cursor,
+        }
     )
 
 
 @endpoint_caja(fiados.CONSULTAR_CUENTAS)
 def detalle(request, cuenta_id):
     cuenta = fiados.obtener_cuenta(cuenta_id)
-    return JsonResponse({**cuenta_json(cuenta), "notas": cuenta.notas})
+    venta_visible = (
+        cuenta.venta_id is not None
+        and ventas_visibles(request.user).filter(pk=cuenta.venta_id).exists()
+    )
+    return JsonResponse(
+        {**cuenta_json(cuenta, venta_visible=venta_visible), "notas": cuenta.notas}
+    )
 
 
 @endpoint_caja(fiados.CONSULTAR_CUENTAS)

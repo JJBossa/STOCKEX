@@ -6,6 +6,7 @@ from . import views
 from . import views_caja
 from . import views_gestion_caja
 from . import views_fiados
+from . import views_panel_fiados
 from . import views_extra
 from . import views_facturas
 from . import views_usuarios
@@ -19,6 +20,7 @@ from . import views_pos
 from . import views_cotizaciones
 from . import views_api
 from . import views_clientes
+from . import alta_cliente
 from . import views_cuentas_cobrar
 from . import views_almacenes
 from . import views_compras
@@ -36,6 +38,17 @@ urlpatterns = [
     path("api/catalogo-productos/", catalogo_productos, name="catalogo_productos"),
     path("pos/registrar-venta/", registrar_venta_pos, name="registrar_venta_pos"),
     path("pos/estado-caja/", views_pos.estado_caja_pos, name="pos_estado_caja"),
+    path("fiados/", views_panel_fiados.panel, name="fiados_panel"),
+    path(
+        "fiados/gestion/clientes/<int:cliente_id>/",
+        views_panel_fiados.cliente,
+        name="fiados_cliente_html",
+    ),
+    path(
+        "fiados/gestion/cuentas/<int:cuenta_id>/",
+        views_panel_fiados.cuenta,
+        name="fiados_cuenta_html",
+    ),
     path(
         "fiados/clientes/", views_fiados.buscar_clientes, name="fiados_buscar_clientes"
     ),
@@ -159,12 +172,28 @@ urlpatterns = [
     # API para mejoras UX
     path('api/buscar-productos/', views_api.buscar_productos_api, name='buscar_productos_api'),
     # Clientes
-    path('clientes/', views_clientes.listar_clientes, name='listar_clientes'),
-    path('clientes/crear/', views_clientes.crear_cliente, name='crear_cliente'),
-    path('clientes/<int:cliente_id>/', views_clientes.detalle_cliente, name='detalle_cliente'),
-    path('clientes/<int:cliente_id>/editar/', views_clientes.editar_cliente, name='editar_cliente'),
-    path('clientes/<int:cliente_id>/eliminar/', views_clientes.eliminar_cliente, name='eliminar_cliente'),
-    path('api/buscar-cliente/', views_clientes.buscar_cliente_api, name='buscar_cliente_api'),
+    path("clientes/", views_clientes.listar_clientes, name="listar_clientes"),
+    path("clientes/crear/", alta_cliente.crear_cliente, name="crear_cliente"),
+    path(
+        "clientes/<int:cliente_id>/",
+        views_clientes.detalle_cliente,
+        name="detalle_cliente",
+    ),
+    path(
+        "clientes/<int:cliente_id>/editar/",
+        views_clientes.editar_cliente,
+        name="editar_cliente",
+    ),
+    path(
+        "clientes/<int:cliente_id>/eliminar/",
+        views_clientes.eliminar_cliente,
+        name="eliminar_cliente",
+    ),
+    path(
+        "api/buscar-cliente/",
+        views_clientes.buscar_cliente_api,
+        name="buscar_cliente_api",
+    ),
     # Cuentas por Cobrar
     path('cuentas-cobrar/', views_cuentas_cobrar.listar_cuentas_cobrar, name='listar_cuentas_cobrar'),
     path('cuentas-cobrar/crear/', views_cuentas_cobrar.crear_cuenta_cobrar, name='crear_cuenta_cobrar'),

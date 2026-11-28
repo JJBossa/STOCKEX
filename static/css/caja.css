@@ -48,3 +48,5 @@ body.dark-mode .caja-vista .text-danger {
 body.dark-mode .caja-vista .text-success {
     color: #85d6a0 !important;
 }
+
+.caja-vista [hidden] { display: none !important; }

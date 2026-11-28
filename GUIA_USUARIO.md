@@ -8,12 +8,13 @@
 5. [Caja](#caja)
 6. [Ventas](#ventas)
 7. [Clientes](#clientes)
-8. [Cotizaciones](#cotizaciones)
-9. [Almacenes](#almacenes)
-10. [Compras](#compras)
-11. [Reportes](#reportes)
-12. [Búsqueda Global](#búsqueda-global)
-13. [Notificaciones](#notificaciones)
+8. [Fiados y abonos](#fiados-y-abonos)
+9. [Cotizaciones](#cotizaciones)
+10. [Almacenes](#almacenes)
+11. [Compras](#compras)
+12. [Reportes](#reportes)
+13. [Búsqueda Global](#búsqueda-global)
+14. [Notificaciones](#notificaciones)
 
 ---
 
@@ -153,6 +154,17 @@ Si una operación queda sin confirmar, usa **Reintentar** en la misma pestaña y
 - Historial de ventas
 - Cuentas por cobrar
 - Opción de crear cuenta por cobrar directamente
+
+---
+
+## Fiados y abonos
+
+1. **Registrar un fiado.** Con caja abierta, prepara la venta rápida o detallada y selecciona **Fiado**. Busca al cliente por nombre o RUT y confirma el total. Puedes agregar vencimiento y observaciones. Si tienes permiso, **Crear cliente** permite darlo de alta sin perder la venta que estás preparando. Solo el nombre es obligatorio.
+2. **Consultar una deuda.** Abre **Menú → Fiados**. Filtra por nombre, RUT, estado o vencimiento. El detalle del cliente muestra su saldo, cuentas e historial de abonos.
+3. **Cobrar.** Desde la cuenta, escribe el importe o usa **Pagar saldo completo** para rellenarlo. Escoge efectivo, tarjeta o transferencia. Pulsa **Revisar abono** y confirma después de comprobar el saldo proyectado.
+4. **Recuperar.** Si el resultado queda pendiente, pulsa **Reintentar** desde la misma pestaña y cuenta. Si el abono ya aparece confirmado y el saldo quedó desactualizado, usa **Actualizar saldo e historial**.
+
+El fiado suma al total vendido y queda como deuda del cliente. Los abonos se registran en la sesión que recibe el pago. Solo los abonos en efectivo aumentan el efectivo esperado de Caja.
 
 ---
 

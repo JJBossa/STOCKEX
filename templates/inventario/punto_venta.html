@@ -105,6 +105,10 @@
                         <label class="btn" for="pos-tarjeta"><i class="bi bi-credit-card" aria-hidden="true"></i>Tarjeta</label>
                         <input class="btn-check" type="radio" name="metodo" id="pos-transferencia" value="transferencia">
                         <label class="btn" for="pos-transferencia"><i class="bi bi-bank" aria-hidden="true"></i>Transferencia</label>
+                        {% if perms.inventario.registrar_venta_fiada %}
+                        <input class="btn-check" type="radio" name="metodo" id="pos-credito" value="credito">
+                        <label class="btn" for="pos-credito"><i class="bi bi-person-check" aria-hidden="true"></i>Fiado</label>
+                        {% endif %}
                     </div>
                     <div id="pos-caja">
                         <label class="form-label" for="pos-recibido">Efectivo recibido <span class="pos-ayuda">(opcional)</span></label>
@@ -118,6 +122,32 @@
                             <span>Vuelto</span><output id="pos-vuelto" for="pos-recibido">$0</output>
                         </div>
                     </div>
+                    {% if perms.inventario.registrar_venta_fiada %}
+                    <section id="pos-fiado" hidden
+                        data-modulo="{% static 'js/pos-fiado.js' %}"
+                        data-clientes="{% url 'fiados_buscar_clientes' %}"
+                        {% if perms.inventario.consultar_cuentas_por_cobrar %}data-saldo="{% url 'fiados_saldo' 0 %}"{% endif %}>
+                        <p class="mb-2">Esta venta queda pendiente de pago.</p>
+                        <label class="form-label" for="pos-cliente-buscar">Cliente</label>
+                        <input class="form-control" id="pos-cliente-buscar" type="search" autocomplete="off" maxlength="100"
+                               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pos-clientes"
+                               aria-describedby="pos-clientes-estado" placeholder="Nombre o RUT">
+                        <ul class="list-group mt-1 pos-clientes" id="pos-clientes" role="listbox" aria-label="Clientes encontrados" hidden></ul>
+                        <p class="pos-ayuda mb-2" id="pos-clientes-estado" role="status">Ingresa al menos dos caracteres.</p>
+                        <div id="pos-cliente-elegido" class="mb-2" hidden>
+                            <strong class="text-break" id="pos-cliente-nombre"></strong>
+                            <button class="btn btn-sm btn-outline-secondary mt-1" type="button" id="pos-quitar-cliente">Quitar cliente</button>
+                            <p class="pos-ayuda mb-0" id="pos-cliente-saldo" role="status"></p>
+                        </div>
+                        {% if es_administrador_nav and perms.inventario.add_cliente %}
+                        <button class="btn btn-sm btn-outline-primary mb-2" type="button" id="pos-alta-cliente">Crear cliente</button>
+                        {% endif %}
+                        <label class="form-label" for="pos-fiado-vencimiento">Vencimiento (opcional)</label>
+                        <input class="form-control mb-2" id="pos-fiado-vencimiento" type="date" min="0001-01-01" max="9999-12-31">
+                        <label class="form-label" for="pos-fiado-notas">Observaciones (opcional)</label>
+                        <textarea class="form-control" id="pos-fiado-notas" rows="2" maxlength="500"></textarea>
+                    </section>
+                    {% endif %}
                 </fieldset>
                 <div class="pos-total">
                     <span>Total</span>
@@ -130,6 +160,40 @@
         </div>
     </form>
 
+    {% if perms.inventario.registrar_venta_fiada %}
+    <dialog class="stockex-confirmacion card shadow p-3" id="pos-fiado-confirmacion" aria-labelledby="pos-fiado-titulo">
+        <h2 class="h5" id="pos-fiado-titulo">Confirmar fiado</h2>
+        <dl class="mb-2">
+            <dt>Cliente</dt><dd class="text-break" id="pos-fiado-revision-cliente"></dd>
+            <dt>Total fiado</dt><dd id="pos-fiado-revision-total"></dd>
+            <dt>Vencimiento</dt><dd id="pos-fiado-revision-fecha"></dd>
+        </dl>
+        <p>No se recibe dinero en esta operación.</p>
+        {% if perms.inventario.consultar_cuentas_por_cobrar %}
+        <p id="pos-fiado-revision-saldo" class="text-break" role="status"></p>
+        {% endif %}
+        <div class="d-flex justify-content-end flex-wrap gap-2">
+            <button class="btn btn-outline-secondary" type="button" id="pos-fiado-volver" autofocus>Volver</button>
+            <button class="btn btn-primary" type="button" id="pos-fiado-confirmar">Confirmar fiado</button>
+        </div>
+    </dialog>
+    {% if es_administrador_nav and perms.inventario.add_cliente %}
+    <dialog class="stockex-confirmacion card shadow p-3" id="pos-cliente-alta" aria-labelledby="pos-cliente-alta-titulo">
+        <h2 class="h5" id="pos-cliente-alta-titulo">Crear cliente</h2>
+        <form id="pos-cliente-formulario" action="{% url 'crear_cliente' %}" method="post">
+            <fieldset disabled>
+                {% include 'inventario/fiados/campos_cliente.html' %}
+            </fieldset>
+            <p class="text-danger mt-2" id="pos-cliente-alta-error" role="alert"></p>
+            <div class="d-flex justify-content-end flex-wrap gap-2">
+                <button class="btn btn-outline-secondary" type="button" id="pos-cliente-alta-volver">Volver</button>
+                <button class="btn btn-primary" type="submit" id="pos-cliente-alta-confirmar" disabled>Crear y seleccionar</button>
+            </div>
+        </form>
+    </dialog>
+    {% endif %}
+    {% endif %}
+
     <section class="pos-panel pos-comprobante" id="pos-ultima" aria-labelledby="pos-titulo-ultima" hidden>
         <h2 id="pos-titulo-ultima"><i class="bi bi-check-circle" aria-hidden="true"></i> Última venta</h2>
         <dl>
@@ -137,6 +201,7 @@
             <div><dt>Fecha y hora</dt><dd><time id="pos-venta-fecha"></time></dd></div>
             <div><dt>Total registrado</dt><dd id="pos-venta-total"></dd></div>
             <div><dt>Método</dt><dd id="pos-venta-metodo"></dd></div>
+            <div id="pos-venta-fiada" hidden><dt>Cuenta por cobrar</dt><dd id="pos-venta-cuenta"></dd></div>
             <div id="pos-venta-efectivo"><dt>Recibido</dt><dd id="pos-venta-recibido"></dd></div>
             <div id="pos-venta-cambio"><dt>Vuelto</dt><dd id="pos-venta-vuelto"></dd></div>
         </dl>
