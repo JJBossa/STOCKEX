@@ -1,10 +1,12 @@
 from uuid import uuid4
 
 import pytest
+from django.db import OperationalError, connection
 from django.test import Client
 from django.urls import reverse
 
 from inventario import anulacion_ventas, caja
+from inventario.bloqueo_caja import sqlite_ocupado
 from inventario.models import (
     AnulacionVenta,
     Cliente,
@@ -122,15 +124,41 @@ def test_cierre_frente_a_fiado_y_abono(admin_user, turno, operacion, cierra_prim
 
 @pytest.mark.parametrize("limite_primero", [False, True])
 def test_limite_legacy_y_fiado_comparten_bloqueo(admin_user, turno, limite_primero):
-    _, cliente = turno
+    sesion, cliente = turno
     navegador = Client()
     navegador.force_login(admin_user)
 
     def cambiar():
-        return navegador.post(
-            reverse("editar_cliente", args=[cliente.pk]),
-            {"nombre": cliente.nombre, "activo": "on", "limite_credito": "500"},
-        ).status_code
+        bloqueo_ocupado = False
+
+        def observar_bloqueo(execute, sql, params, many, context):
+            nonlocal bloqueo_ocupado
+            try:
+                return execute(sql, params, many, context)
+            except OperationalError as error:
+                if '"inventario_bloqueocaja"' in sql and sqlite_ocupado(error):
+                    bloqueo_ocupado = True
+                raise
+
+        with connection.execute_wrapper(observar_bloqueo):
+            respuesta = navegador.post(
+                reverse("editar_cliente", args=[cliente.pk]),
+                {"nombre": cliente.nombre, "activo": "on", "limite_credito": "500"},
+            )
+        assert bloqueo_ocupado == (respuesta.status_code == 503)
+        if bloqueo_ocupado:
+            assert respuesta["Retry-After"] == "1"
+            assert (
+                respuesta.content.decode() == "La base está ocupada. Vuelve a intentar."
+            )
+            assert Cliente.objects.get(pk=cliente.pk).limite_credito == 1000
+            return "base_ocupada"
+        if respuesta.status_code == 200:
+            assert (
+                "El límite es menor que el saldo pendiente."
+                in respuesta.content.decode()
+            )
+        return respuesta.status_code
 
     def vender():
         return fiar(admin_user, cliente, 600)
@@ -139,8 +167,18 @@ def test_limite_legacy_y_fiado_comparten_bloqueo(admin_user, turno, limite_prime
         estado, rechazo = competir(cambiar, vender)
         assert estado == 302 and rechazo == "limite_credito_excedido"
         assert not Venta.objects.exists()
+        assert (
+            not RegistroVenta.objects.exists() and not CuentaPorCobrar.objects.exists()
+        )
     else:
-        _, estado = competir(vender, cambiar)
-        assert estado == 200 and Venta.objects.count() == 1
+        (venta, deuda), estado = competir(vender, cambiar)
+        assert estado == 200
+        assert Venta.objects.get().pk == venta.pk
+        assert venta.sesion_caja_id == sesion.pk and venta.total == 600
+        assert RegistroVenta.objects.get().venta_id == venta.pk
+        assert CuentaPorCobrar.objects.get().pk == deuda.pk
+        assert deuda.venta_id == venta.pk and deuda.cliente_id == cliente.pk
+        assert deuda.monto_total == deuda.saldo_pendiente == 600
+        assert deuda.estado == "pendiente" and deuda.fiado_seguro
     cliente.refresh_from_db()
     assert cliente.limite_credito == (500 if limite_primero else 1000)
