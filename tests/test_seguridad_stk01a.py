@@ -197,16 +197,27 @@ def test_superusuario_puede_consultar_pero_no_escribir_operaciones_suspendidas(
     client.force_login(admin_user)
     assert client.get(reverse('detalle_cuenta_cobrar', args=[cuenta.pk])).status_code == 200
     for ruta, args in [
-        ('procesar_venta', []), ('cancelar_venta', [venta.pk]),
-        ('convertir_cotizacion_en_venta', [1]), ('crear_cuenta_cobrar', []),
-        ('registrar_pago', [cuenta.pk]), ('crear_devolucion_venta', [venta.pk]),
-        ('procesar_devolucion', [1]), ('rechazar_devolucion', [1]),
+        ("procesar_venta", []),
+        ("convertir_cotizacion_en_venta", [1]),
+        ("crear_cuenta_cobrar", []),
+        ("registrar_pago", [cuenta.pk]),
+        ("crear_devolucion_venta", [venta.pk]),
+        ("procesar_devolucion", [1]),
+        ("rechazar_devolucion", [1]),
     ]:
         assert client.post(reverse(ruta, args=args)).status_code == 423
     assert client.post(reverse('admin:inventario_venta_add')).status_code == 403
     assert client.post(reverse('admin:inventario_venta_change', args=[venta.pk])).status_code == 403
     assert Venta.objects.count() == 1
     assert PagoCliente.objects.count() == 1
+
+    anulacion = client.post(
+        reverse("cancelar_venta", args=[venta.pk]), {"motivo": "Duplicada"}
+    )
+    assert anulacion.status_code == 409
+    venta.refresh_from_db()
+    assert not venta.cancelada
+    assert not hasattr(venta, "anulacion")
 
 
 def test_historial_no_se_borra_via_html_api_o_admin(client, admin_user, venta, cuenta):
