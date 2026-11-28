@@ -1,0 +1,45 @@
+{% extends 'inventario/caja/base.html' %}
+{% load ventas_tags %}
+{% block title %}Fiados de {{ cliente.nombre }} - STOCKEX{% endblock %}
+{% block content %}
+<section class="caja-vista">
+    <header data-controles-accesibilidad class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div><h1 class="h3 text-break">{{ cliente.nombre }}</h1><p class="mb-0">{{ cliente.activo|yesno:"Activo,Inactivo" }} · {% if cliente.rut %}RUT {{ cliente.rut }}{% else %}Sin RUT{% endif %}</p></div>
+        <a class="btn btn-outline-secondary" href="{{ volver }}">Volver a Fiados</a>
+    </header>
+    {% if situacion is None or not limite_valido %}<p class="alert alert-warning">Hay datos financieros por conciliar.</p>{% endif %}
+    <dl class="row g-2 mb-3">
+        <div class="col-sm-4"><dt>Saldo pendiente</dt><dd>{% if situacion is not None %}{{ situacion.saldo|clp }}{% else %}Por conciliar{% endif %}</dd></div>
+        <div class="col-sm-4"><dt>Límite de crédito</dt><dd>{% if not limite_valido %}Por conciliar{% elif cliente.limite_credito %}{{ cliente.limite_credito|clp }}{% else %}Sin tope{% endif %}</dd></div>
+        {% if credito_disponible is not None %}<div class="col-sm-4"><dt>Crédito disponible</dt><dd>{{ credito_disponible|clp }}</dd></div>{% endif %}
+    </dl>
+    <h2 class="h5" id="cuentas">Cuentas por cobrar</h2>
+    <form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-2">
+        <input type="hidden" name="lista" value="{{ lista }}">
+        <div><label class="form-label" for="fiados-estado">Estado de las cuentas</label>
+        <select class="form-select" id="fiados-estado" name="estado">
+            <option value="pendientes" {% if estado == "pendientes" %}selected{% endif %}>Pendientes</option>
+            <option value="pagadas" {% if estado == "pagadas" %}selected{% endif %}>Pagadas</option>
+            <option value="canceladas" {% if estado == "canceladas" %}selected{% endif %}>Canceladas</option>
+            <option value="todas" {% if estado == "todas" %}selected{% endif %}>Todas</option>
+        </select></div>
+        <button class="btn btn-outline-primary" type="submit">Ver cuentas</button>
+    </form>
+    <div class="table-responsive" role="region" aria-label="Cuentas por cobrar" tabindex="0">
+    <table class="table table-sm align-middle">
+        <thead><tr><th scope="col">Documento</th><th scope="col">Emisión</th><th scope="col">Vencimiento</th><th scope="col">Saldo</th><th scope="col">Estado</th></tr></thead>
+        <tbody>
+            {% for cuenta in cuentas %}
+            <tr><th scope="row"><a href="{% url 'fiados_cuenta_html' cuenta.id %}?lista={{ lista|urlencode }}&amp;estado={{ estado }}">{{ cuenta.numero_documento }}</a></th>
+                <td>{{ cuenta.fecha_emision|date:"d/m/Y" }}</td><td>{{ cuenta.fecha_vencimiento|date:"d/m/Y"|default:"—" }}</td>
+                <td>{% if cuenta.saldo is not None %}{{ cuenta.saldo|clp }}{% else %}Por conciliar{% endif %}</td>
+                <td>{% include 'inventario/fiados/estado_cuenta.html' %}</td></tr>
+            {% empty %}<tr><td colspan="5">No hay cuentas en este estado.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if mas_cuentas %}<a class="btn btn-sm btn-outline-secondary" href="{{ mas_cuentas }}#cuentas">Cuentas anteriores</a>{% endif %}
+    <h2 class="h5 mt-4" id="historial-abonos">Historial de abonos</h2>
+    {% include 'inventario/fiados/historial_abonos.html' with mostrar_documento=True %}
+</section>
+{% endblock %}

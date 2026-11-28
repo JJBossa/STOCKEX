@@ -1,0 +1,28 @@
+<div class="row g-2">
+    <div class="col-12">
+        <label class="form-label" for="alta-nombre">Nombre</label>
+        <input class="form-control" id="alta-nombre" name="nombre" required maxlength="200" value="{{ datos.nombre }}">
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label" for="alta-rut">RUT (opcional)</label>
+        <input class="form-control" id="alta-rut" name="rut" maxlength="20" value="{{ datos.rut }}">
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label" for="alta-telefono">Teléfono (opcional)</label>
+        <input class="form-control" id="alta-telefono" name="telefono" type="tel" maxlength="50" value="{{ datos.telefono }}">
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label" for="alta-email">Correo (opcional)</label>
+        <input class="form-control" id="alta-email" name="email" type="email" value="{{ datos.email }}">
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label" for="alta-limite">Límite de crédito (CLP)</label>
+        <input class="form-control" id="alta-limite" name="limite_credito" type="number" min="0" max="999999999999" step="1"
+               value="{{ datos.limite_credito }}" aria-describedby="alta-limite-ayuda">
+        <small id="alta-limite-ayuda">En blanco o $0 para crédito sin tope.</small>
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="alta-notas">Observaciones (opcional)</label>
+        <textarea class="form-control" id="alta-notas" name="notas" maxlength="500" rows="2">{{ datos.notas }}</textarea>
+    </div>
+</div>

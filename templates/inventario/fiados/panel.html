@@ -1,0 +1,86 @@
+{% extends 'inventario/caja/base.html' %}
+{% load ventas_tags %}
+{% block title %}Fiados - STOCKEX{% endblock %}
+{% block content %}
+<section class="caja-vista">
+    <header class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-controles-accesibilidad>
+        <h1 class="mb-0">Fiados</h1>
+        {% if es_administrador_nav and perms.inventario.add_cliente %}<a class="btn btn-outline-primary" href="{% url 'crear_cliente' %}">Crear cliente</a>{% endif %}
+    </header>
+    {% if totales.inconsistentes %}
+        <p class="alert alert-warning">Hay {{ totales.inconsistentes }} cuenta{{ totales.inconsistentes|pluralize }} por conciliar. Los importes pendientes y vencidos requieren revisión.</p>
+    {% endif %}
+    <div class="row row-cols-2 row-cols-lg-5 g-2 mb-3">
+        <div class="col"><div class="card h-100"><div class="card-body">
+            <span>Saldo pendiente</span>
+            <strong class="d-block text-break">{% if totales.saldo is not None %}{{ totales.saldo|clp }}{% else %}Por conciliar{% endif %}</strong>
+        </div></div></div>
+        <div class="col"><div class="card h-100"><div class="card-body"><span>Clientes con deuda</span><strong class="d-block">{{ totales.clientes }}</strong></div></div></div>
+        <div class="col"><div class="card h-100"><div class="card-body"><span>Cuentas pendientes</span><strong class="d-block">{{ totales.pendientes }}</strong></div></div></div>
+        <div class="col"><div class="card h-100"><div class="card-body">
+            <span>Deuda vencida</span>
+            <strong class="d-block text-break">{% if totales.vencido is not None %}{{ totales.vencido|clp }}{% else %}Por conciliar{% endif %}</strong>
+        </div></div></div>
+        <div class="col"><div class="card h-100"><div class="card-body">
+            <span>Abonos del día en Chile</span>
+            <strong class="d-block text-break">{% if totales.abonos_hoy is not None %}{{ totales.abonos_hoy|clp }}{% else %}Por conciliar{% endif %}</strong>
+            <small>{{ hoy|date:"d/m/Y" }} · todas las sesiones</small>
+        </div></div></div>
+    </div>
+
+    <h2 class="h5">Clientes</h2>
+    <form method="get" class="row gx-3 gy-2 align-items-end mb-3">
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="fiados-buscar">Nombre o RUT</label>
+            <input class="form-control" id="fiados-buscar" name="q" type="search" maxlength="100" value="{{ q }}">
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="fiados-activo">Estado del cliente</label>
+            <select class="form-select" id="fiados-activo" name="activo">
+                <option value="">Todos</option>
+                <option value="1" {% if filtros.activo == "1" %}selected{% endif %}>Activos</option>
+                <option value="0" {% if filtros.activo == "0" %}selected{% endif %}>Inactivos</option>
+            </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="fiados-orden">Orden</label>
+            <select class="form-select" id="fiados-orden" name="orden">
+                <option value="nombre">Nombre</option>
+                <option value="saldo" {% if filtros.orden == "saldo" %}selected{% endif %}>Mayor saldo</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-check"><input type="checkbox" class="form-check-input" name="deuda" value="1" {% if filtros.deuda == "1" %}checked{% endif %}> Con deuda</label>
+            <label class="form-check"><input type="checkbox" class="form-check-input" name="vencidas" value="1" {% if filtros.vencidas == "1" %}checked{% endif %}> Vencida</label>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" type="submit">Filtrar</button>
+            <a class="btn btn-outline-secondary" href="{% url 'fiados_panel' %}">Limpiar</a>
+        </div>
+    </form>
+    <div class="table-responsive" role="region" aria-label="Clientes" tabindex="0">
+        <table class="table table-sm align-middle">
+            <thead><tr><th scope="col">Nombre</th><th scope="col">RUT</th><th scope="col">Saldo</th><th scope="col">Cuentas pendientes</th><th scope="col">Vencimiento</th><th scope="col">Estado</th></tr></thead>
+            <tbody>
+                {% for cliente in pagina %}
+                <tr>
+                    <th scope="row"><a href="{% url 'fiados_cliente_html' cliente.pk %}?lista={{ lista|urlencode }}">{{ cliente.nombre }}</a></th>
+                    <td>{{ cliente.rut|default:"—" }}</td>
+                    <td>{% if cliente.requiere_conciliacion %}Por conciliar{% else %}{{ cliente.saldo|clp }}{% endif %}</td>
+                    <td>{{ cliente.pendientes }}</td>
+                    <td>{% if cliente.requiere_conciliacion %}Por revisar{% elif cliente.vencidas %}Con deuda vencida{% else %}—{% endif %}</td>
+                    <td>{{ cliente.activo|yesno:"Activo,Inactivo" }}</td>
+                </tr>
+                {% empty %}<tr><td colspan="6">No hay clientes para esos filtros.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagina.has_other_pages %}
+    <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Páginas de clientes">
+        {% if pagina.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?{{ sin_pagina }}&amp;page={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+        <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+        {% if pagina.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?{{ sin_pagina }}&amp;page={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}

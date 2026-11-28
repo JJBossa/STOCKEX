@@ -459,6 +459,226 @@ try {
         await texto(gestion.locator("main"), "1 venta vigente");
     });
 
+    const rutaAbono = "**/fiados/cuentas/*/abonar/";
+    const abonos = observar(otraCaja, /\/fiados\/cuentas\/\d+\/abonar\/$/);
+    const fiadosPos = observar(gestion, /\/pos\/registrar-venta\/$/);
+    const posCampo = nombre => gestion.locator("#pos-" + nombre);
+    const elegirFiado = () => gestion.locator('label[for="pos-credito"]').click();
+    let idCuenta, idCliente, rutaCuenta;
+
+    async function cambiarCliente(page, activo) {
+        const url = origen + `/clientes/${idCliente}/editar/`;
+        const respuesta = await page.request.post(url, {
+            form: {nombre: "Cliente <em>Alta fiado</em>", limite_credito: "1200", activo: activo ? "on" : ""},
+            headers: {"X-CSRFToken": await csrf(page)}, maxRedirects: 0,
+        });
+        assert.equal(respuesta.status(), 302);
+    }
+
+    async function abrirParaFiados() {
+        await gestion.goto(origen + "/caja/");
+        await el(gestion, "inicial").fill("0");
+        await btn(gestion, "Abrir caja").click();
+        await esperarEstado(gestion, true);
+        await gestion.goto(origen + "/pos/");
+        await elegirFiado();
+    }
+
+    await prueba("fiado rápido con clientes homónimos, búsqueda fuera de orden y alta que conserva el borrador", async () => {
+        await pos.goto(origen + "/pos/");
+        assert.equal(await pos.locator("#pos-credito").count(), 0);
+        await abrirParaFiados();
+        await posCampo("monto").fill("1000");
+        const modoFiado = gestion.locator('label[for="pos-credito"]');
+        await gestion.locator('label[for="pos-efectivo"]').click();
+        await modoFiado.click();
+        const consulta = posCampo("cliente-buscar");
+        let soltarVieja, terminoVieja;
+        const vieja = new Promise(resolve => { soltarVieja = resolve; });
+        const viejaTerminada = new Promise(resolve => { terminoVieja = resolve; });
+        await gestion.route("**/fiados/clientes/?q=anterior", async route => {
+            await vieja;
+            await route.fulfill({json: {clientes: [{id: 901, nombre: "Resultado anterior", rut: null}]}}).catch(() => {});
+            terminoVieja();
+        }, {times: 1});
+        const emitida = gestion.waitForRequest(r => r.url().endsWith("?q=anterior"));
+        await consulta.fill("anterior");
+        await emitida;
+        await consulta.fill("Coincidente");
+        const opciones = gestion.getByRole("option");
+        await opciones.first().waitFor();
+        assert.equal(await opciones.count(), 2);
+        soltarVieja();
+        await viejaTerminada;
+        assert.equal(await gestion.getByText("Resultado anterior").count(), 0);
+        assert.equal(await opciones.count(), 2);
+        assert.equal(await gestion.locator("#pos-clientes em").count(), 0);
+        await consulta.press("ArrowDown");
+        await consulta.press("ArrowDown");
+        const segunda = await opciones.nth(1).textContent();
+        await consulta.press("Enter");
+        assert.equal(await posCampo("cliente-nombre").textContent(), segunda);
+        await btn(gestion, "Quitar cliente").click();
+        await btn(gestion, "Crear cliente").click();
+        await gestion.locator("#alta-nombre").fill("Cliente <em>Alta fiado</em>");
+        await gestion.locator("#alta-limite").fill("1200");
+        const altas = observar(gestion, /\/clientes\/crear\/$/);
+        const respuesta = await postUI(gestion, /\/clientes\/crear\/$/, () =>
+            btn(gestion, "Crear y seleccionar").evaluate(boton => { boton.click(); boton.click(); }));
+        assert.equal(respuesta.status(), 201);
+        idCliente = (await respuesta.json()).id;
+        await texto(posCampo("cliente-nombre").locator(".."), /Alta fiado.*#/);
+        assert.equal(altas.length, 1);
+        assert.equal(await posCampo("monto").inputValue(), "1.000");
+        assert.equal(await posCampo("caja").isVisible(), false);
+        assert.equal(await posCampo("cliente-nombre").locator("em").count(), 0);
+
+        await posCampo("fiado-vencimiento").fill("2024-01-01");
+        await posCampo("fiado-notas").fill("Vale del turno");
+        await posCampo("registrar").click();
+        const dialogo = gestion.getByRole("dialog", {name: "Confirmar fiado"});
+        await texto(dialogo, /Saldo proyectado \$1\.000/);
+        await texto(dialogo, "No se recibe dinero en esta operación.");
+        assert.equal(fiadosPos.length, 0);
+        await gestion.route(rutaVenta, async route => {
+            const registrada = await route.fetch();
+            idCuenta = (await registrada.json()).cuenta_id;
+            assert.equal(registrada.status(), 201);
+            await route.abort("failed");
+        }, {times: 1});
+        await btn(gestion, "Confirmar fiado").click();
+        await texto(posCampo("error"), /No se pudo verificar/);
+        assert.equal(JSON.parse(fiadosPos[0].cuerpo).cliente_id, idCliente);
+        rutaCuenta = `/fiados/gestion/cuentas/${idCuenta}/`;
+    });
+
+    await prueba("abono parcial y pago total sobre deuda vencida, con borrador y respuesta recuperable", async () => {
+        await otraCaja.goto(origen + rutaCuenta);
+        assert.match(await otraCaja.locator("#fiados-datos").innerText(), /Pendiente\s*·\s*Vencida/);
+        await cambiarCliente(otraCaja, false);
+        const inactivo = await otraCaja.request.get(origen + "/fiados/clientes/?q=Alta%20fiado");
+        assert.deepEqual((await inactivo.json()).clientes, []);
+        await otraCaja.locator("#abono-importe").fill("1001");
+        await btn(otraCaja, "Revisar abono").click();
+        await texto(otraCaja.locator("#abono-error"), /dentro del saldo pendiente/);
+        assert.equal(abonos.length, 0);
+        await otraCaja.locator("#abono-importe").fill("350");
+        await otraCaja.locator("#abono-referencia").fill("<img src=x>");
+        await otraCaja.locator("#abono-observaciones").fill("<script>x</script>");
+        await btn(otraCaja, "Revisar abono").click();
+        await texto(otraCaja.getByRole("dialog"), /Saldo proyectado \$650/);
+        await btn(otraCaja, "Confirmar abono").evaluate(boton => { boton.click(); boton.click(); });
+        await texto(otraCaja.locator("#abono-estado"), "Abono confirmado.");
+        await texto(otraCaja.locator("#fiados-pagos"), "<img src=x>");
+        assert.equal(abonos.length, 1);
+        assert.equal(await otraCaja.locator("#fiados-pagos img, #fiados-pagos script").count(), 0);
+        await btn(otraCaja, "Pagar saldo completo").click();
+        assert.equal(await otraCaja.locator("#abono-importe").inputValue(), "650");
+        assert.equal(abonos.length, 1);
+        await otraCaja.locator("#abono-metodo").selectOption("transferencia");
+        await btn(otraCaja, "Revisar abono").click();
+        await perderTrasGuardar(otraCaja, rutaAbono);
+        await btn(otraCaja, "Confirmar abono").click();
+        await texto(otraCaja.locator("#abono-error"), /Abono sin confirmar/);
+        assert.equal(abonos.length, 2);
+        await entrar(otraCaja, "pos-administrador-b", rutaCuenta);
+        assert.equal(await btn(otraCaja, "Reintentar abono pendiente").isVisible(), false);
+        await entrar(otraCaja, admin, rutaCuenta);
+
+        const controlCaja = await (await contexto()).newPage();
+        await entrar(controlCaja, admin, "/caja/");
+        await texto(el(controlCaja, "resumen"), /Abonos \$1\.000/);
+        await texto(el(controlCaja, "resumen"), "1 venta vigente");
+        await revisar(controlCaja, 350);
+        await btn(controlCaja, "Confirmar cierre").click();
+        await controlCaja.waitForURL(/\/caja\/historial\/\d+\/$/);
+        await texto(controlCaja.locator("main"), "Caja cuadrada");
+        await otraCaja.reload();
+        await texto(otraCaja.locator("#fiados-datos"), /Caja cerrada/);
+        await btn(otraCaja, "Reintentar abono pendiente").click();
+        await texto(otraCaja.locator("#abono-estado"), /Abono recuperado/);
+        assert.deepEqual(abonos[2], abonos[1]);
+        assert.equal(await btn(otraCaja, "Revisar abono").isDisabled(), true);
+        await gestion.reload();
+        await texto(gestion.locator("#pos-estado-caja"), "Caja cerrada");
+        await btn(gestion, "Reintentar registro").click();
+        await texto(posCampo("estado"), /Venta recuperada/);
+        assert.deepEqual(fiadosPos[1], fiadosPos[0]);
+    });
+
+    await prueba("fiado detallado, límite excedido y consultas nativas del panel", async () => {
+        await cambiarCliente(otraCaja, true);
+        await abrirParaFiados();
+        await gestion.locator('label[for="pos-modo-detallada"]').click();
+        await gestion.getByText(/^Catálogo listo ·/).waitFor();
+        await gestion.locator("[data-consulta]").fill("000019");
+        await gestion.getByRole("option").filter({hasText: "Agua con gas"}).click();
+        await posCampo("cliente-buscar").fill("Alta fiado");
+        await gestion.getByRole("option").filter({hasText: "Alta fiado"}).click();
+        await gestion.locator("[data-cantidad]").fill("1201");
+        await posCampo("registrar").click();
+        await btn(gestion, "Confirmar fiado").click();
+        await texto(posCampo("error"), /supera el límite de crédito/);
+        await gestion.locator("[data-cantidad]").fill("10");
+        await posCampo("registrar").click();
+        await btn(gestion, "Confirmar fiado").click();
+        await texto(posCampo("estado"), "Venta registrada.");
+        await texto(posCampo("venta-metodo"), "Fiado");
+        const sinJs = await (await contexto({javaScriptEnabled: false})).newPage();
+        await entrar(sinJs, admin, "/fiados/?deuda=1&orden=saldo", false);
+        await texto(sinJs.locator("main"), "Abonos del día en Chile");
+        await sinJs.getByRole("link", {name: /Alta fiado/}).press("Enter");
+        await sinJs.waitForURL(/\/fiados\/gestion\/clientes\//);
+        await texto(sinJs.locator("main"), "Historial de abonos");
+        const regreso = await sinJs.getByRole("link", {name: "Volver a Fiados"}).getAttribute("href");
+        assert.match(regreso, /deuda=1/);
+        assert.match(regreso, /orden=saldo/);
+    });
+
+    await prueba("CSRF, sesión vencida y refresco fallido tras un abono confirmado", async () => {
+        const deuda = (await posCampo("venta-cuenta").textContent()).replace("#", "");
+        const url = `/fiados/gestion/cuentas/${deuda}/`;
+        await otraCaja.goto(origen + url);
+        await otraCaja.locator("#abono-importe").fill("5");
+        await btn(otraCaja, "Revisar abono").click();
+        await otraCaja.route(rutaAbono, route => route.continue({
+            headers: {...route.request().headers(), "x-csrftoken": "invalido"},
+        }), {times: 1});
+        const csrfRechazado = await postUI(otraCaja, /\/abonar\/$/, () => btn(otraCaja, "Confirmar abono").click());
+        assert.equal(csrfRechazado.status(), 403);
+        await texto(otraCaja.locator("#abono-error"), /misma cuenta/);
+        await otraCaja.context().clearCookies({name: "sessionid"});
+        await btn(otraCaja, "Reintentar abono pendiente").click();
+        await texto(otraCaja.locator("#abono-error"), /misma cuenta/);
+        await entrar(otraCaja, admin, url);
+        await otraCaja.route("**/*fragmento=abono", route => route.fulfill({status: 503}), {times: 1});
+        await btn(otraCaja, "Reintentar abono pendiente").click();
+        await texto(otraCaja.locator("#abono-estado"), "Abono confirmado.");
+        await texto(otraCaja.locator("#abono-error"), /El abono está confirmado/);
+        assert.equal(await btn(otraCaja, "Reintentar abono pendiente").isVisible(), false);
+        assert.deepEqual(abonos.at(-1), abonos.at(-2));
+        assert.deepEqual(abonos.at(-2), abonos.at(-3));
+        await otraCaja.getByRole("link", {name: "Actualizar saldo e historial"}).click();
+        await texto(otraCaja.locator("#fiados-pagos"), "$5");
+        assert.equal(await btn(otraCaja, "Revisar abono").isEnabled(), true);
+    });
+
+    await prueba("Fiados, abonos y POS en modo claro y oscuro a 390/768/1366/1920 px", async () => {
+        for (const ruta of ["/fiados/", rutaCuenta, "/pos/"]) {
+            await gestion.setViewportSize({width: 1366, height: 900});
+            await gestion.goto(origen + ruta);
+            if (ruta === "/pos/") await elegirFiado();
+            for (const oscuro of [false, true]) {
+                const estaOscuro = await gestion.locator("body").evaluate(body => body.classList.contains("dark-mode"));
+                if (estaOscuro !== oscuro) await gestion.locator("#dark-mode-toggle").click();
+                for (const width of [390, 768, 1366, 1920]) {
+                    await gestion.setViewportSize({width, height: 900});
+                    await gestion.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1);
+                }
+            }
+        }
+    });
+
     assert.deepEqual(errores, []);
 } catch (error) {
     const log = await readFile(join(temporal, "django.log"), "utf8").catch(() => "");

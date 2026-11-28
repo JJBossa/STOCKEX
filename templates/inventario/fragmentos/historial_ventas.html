@@ -55,7 +55,7 @@
             <dl class="hist-pagos">
                 {% for pago in resumen.pagos %}
                 <div>
-                    <dt>{{ pago.etiqueta }}{% if pago.metodo == 'efectivo' %} neto{% endif %}</dt>
+                    <dt>{% if pago.metodo == 'credito' %}Fiado{% else %}{{ pago.etiqueta }}{% endif %}{% if pago.metodo == 'efectivo' %} neto{% endif %}</dt>
                     <dd>{{ pago.total|clp }} <small>· {{ pago.cantidad }} venta{{ pago.cantidad|pluralize }}</small></dd>
                 </div>
                 {% endfor %}
@@ -87,7 +87,7 @@
                         <th scope="row">{{ venta.numero_venta }}</th>
                         <td><time datetime="{{ venta.fecha|date:'c' }}">{{ venta.fecha|date:"d/m/Y H:i" }}</time></td>
                         <td>{{ venta.get_modalidad_display|default_if_none:"Histórica sin clasificar" }}</td>
-                        <td>{{ venta.get_metodo_pago_display }}</td>
+                        <td>{% if venta.metodo_pago == 'credito' %}Fiado{% else %}{{ venta.get_metodo_pago_display }}{% endif %}</td>
                         <td class="hist-monto">{{ venta.total|clp }}</td>
                         {% if es_admin %}<td>{{ venta.usuario.username|default:"—" }}</td>{% endif %}
                         <td>{% include 'inventario/fragmentos/estado_venta.html' %}</td>

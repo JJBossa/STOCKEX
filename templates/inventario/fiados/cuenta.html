@@ -1,0 +1,53 @@
+{% extends 'inventario/caja/base.html' %}
+{% load static %}
+{% block title %}Cuenta {{ registro.numero_documento }} - STOCKEX{% endblock %}
+{% block content %}
+<section class="caja-vista" {% if puede_abonar %}data-abonos data-url="{% url 'fiados_abonar' registro.pk %}"
+         data-cuenta-url="{% url 'fiados_cuenta_html' 0 %}" data-usuario="{{ request.user.pk }}"{% endif %}>
+    <header data-controles-accesibilidad class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div><h1 class="h3 text-break">Cuenta {{ registro.numero_documento }}</h1><p class="mb-0 text-break">{{ cliente.nombre }}</p></div>
+        <a class="btn btn-outline-secondary" href="{% url 'fiados_cliente_html' cliente.pk %}?lista={{ lista|urlencode }}&amp;estado={{ request.GET.estado|default:'pendientes'|urlencode }}">Volver al cliente</a>
+    </header>
+    <div id="fiados-datos">{% include 'inventario/fiados/datos_cuenta.html' %}</div>
+    {% if puede_abonar %}
+        <noscript><p class="alert alert-warning">Habilita JavaScript para confirmar abonos. Las consultas están disponibles.</p></noscript>
+        <p id="abono-estado" class="mb-2" role="status" tabindex="-1"></p>
+        <p id="abono-error" class="mb-2 text-danger" role="alert" tabindex="-1"></p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <a id="abono-actualizar" class="btn btn-sm btn-outline-secondary" href="{{ request.get_full_path }}">Actualizar saldo e historial</a>
+            <button type="button" class="btn btn-sm btn-primary" id="abono-reintentar" hidden>Reintentar abono pendiente</button>
+            <a class="btn btn-sm btn-primary" id="abono-ir-pendiente" hidden>Ir a la cuenta del abono pendiente</a>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="abono-conciliar" hidden>Confirmar que concilié la operación</button>
+        </div>
+        <form class="card mb-3" id="abono-formulario" method="post" novalidate>
+            <fieldset class="card-body" disabled>
+                <legend class="h5">Registrar abono</legend>
+                <div class="row g-2">
+                    <div class="col-sm-6"><label class="form-label" for="abono-importe">Importe (CLP)</label>
+                        <input type="text" inputmode="numeric" class="form-control" id="abono-importe" name="importe" maxlength="15" required>
+                        <button class="btn btn-link btn-sm px-0" type="button" id="abono-completo">Pagar saldo completo</button></div>
+                    <div class="col-sm-6"><label class="form-label" for="abono-metodo">Método de pago</label>
+                        <select class="form-select" id="abono-metodo" name="metodo_pago"><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option></select></div>
+                    <div class="col-sm-6"><label class="form-label" for="abono-referencia">Referencia (opcional)</label>
+                        <input class="form-control" id="abono-referencia" name="referencia" maxlength="200"></div>
+                    <div class="col-sm-6"><label class="form-label" for="abono-observaciones">Observaciones (opcional)</label>
+                        <textarea class="form-control" id="abono-observaciones" name="observaciones" rows="2" maxlength="500"></textarea></div>
+                </div>
+                <p class="mt-2 mb-2">Saldo proyectado <output id="abono-proyectado" for="abono-importe">—</output></p>
+                <button type="submit" class="btn btn-primary">Revisar abono</button>
+            </fieldset>
+        </form>
+        <dialog class="stockex-confirmacion card shadow p-3" id="abono-confirmacion" aria-labelledby="abono-titulo">
+            <h2 class="h5" id="abono-titulo">Confirmar abono</h2>
+            <p id="abono-revision"></p>
+            <div class="d-flex justify-content-end flex-wrap gap-2">
+                <button class="btn btn-outline-secondary" type="button" id="abono-volver" autofocus>Volver</button>
+                <button class="btn btn-primary" type="button" id="abono-confirmar">Confirmar abono</button>
+            </div>
+        </dialog>
+    {% endif %}
+    <h2 class="h5" id="historial-abonos">Historial de abonos</h2>
+    <div id="fiados-pagos">{% include 'inventario/fiados/historial_abonos.html' %}</div>
+</section>
+{% endblock %}
+{% block extra_js %}{% if puede_abonar %}<script type="module" src="{% static 'js/abonos.js' %}"></script>{% endif %}{% endblock %}

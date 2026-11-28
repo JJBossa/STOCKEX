@@ -41,7 +41,7 @@
                     <span class="badge bg-{{ cuenta.estado|yesno:'warning,info,success,secondary' }}">{{ cuenta.get_estado_display }}</span>
                     {% endif %}
                 </p>
-                {% if cuenta.venta %}
+                {% if venta_visible %}
                 <p><strong>Venta:</strong> <a href="{% url 'detalle_venta' cuenta.venta.id %}">{{ cuenta.venta.numero_venta }}</a></p>
                 {% endif %}
             </div>

@@ -12,7 +12,11 @@ from .fiados import CONSULTAR_CUENTAS
 from .historial_ventas import SANTIAGO
 from .models import CuentaPorCobrar
 from .utils import es_administrador
-from .access import operaciones_financieras_suspendidas, permiso_requerido
+from .access import (
+    operaciones_financieras_suspendidas,
+    permiso_requerido,
+    ventas_visibles,
+)
 
 
 @never_cache
@@ -87,10 +91,15 @@ def detalle_cuenta_cobrar(request, cuenta_id):
         CuentaPorCobrar.objects.select_related("cliente", "venta"), id=cuenta_id
     )
     pagos = cuenta.pagos.all().order_by("-fecha_pago")
+    venta_visible = (
+        cuenta.venta_id is not None
+        and ventas_visibles(request.user).filter(pk=cuenta.venta_id).exists()
+    )
 
     context = {
         "cuenta": cuenta,
         "pagos": pagos,
+        "venta_visible": venta_visible,
         "es_admin": es_administrador(request.user),
     }
 

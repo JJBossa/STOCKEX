@@ -246,3 +246,11 @@ body.dark-mode .pos .form-control::placeholder { color: var(--pos-secundario); o
     body:has(.pos) .navbar-nav { width: 100%; flex-wrap: wrap; flex-direction: row; gap: .2rem; }
     body:has(.pos) .navbar-nav > .btn-lg { font-size: .9rem; padding: .4rem .65rem; }
 }
+
+.pos-clientes { max-height: 14rem; overflow: auto; }
+.pos-clientes [role="option"] { cursor: pointer; overflow-wrap: anywhere; }
+.pos-clientes [aria-selected="true"] { outline: 2px solid var(--pos-primario); outline-offset: -2px; }
+.pos-metodos:has(#pos-credito) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 550px) {
+    .pos-metodos:has(#pos-credito) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

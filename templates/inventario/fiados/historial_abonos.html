@@ -1,0 +1,19 @@
+{% load ventas_tags tz %}
+<div class="table-responsive" role="region" aria-label="Historial de abonos" tabindex="0">
+    <table class="table table-sm align-middle">
+        <thead><tr><th scope="col">Fecha de pago</th>{% if mostrar_documento %}<th scope="col">Cuenta</th>{% endif %}<th scope="col">Importe</th><th scope="col">Método</th><th scope="col">Responsable</th><th scope="col">Caja</th><th scope="col">Referencia</th><th scope="col">Observaciones</th></tr></thead>
+        <tbody>
+            {% for pago in pagos %}
+            <tr>
+                <td>{{ pago.fecha_pago|date:"d/m/Y" }}<small class="d-block">{% timezone "America/Santiago" %}Registro {{ pago.fecha_registro|date:"d/m/Y H:i" }}{% endtimezone %}</small></td>
+                {% if mostrar_documento %}<td><a href="{% url 'fiados_cuenta_html' pago.cuenta_por_cobrar_id %}?lista={{ lista|urlencode }}">{{ pago.cuenta_por_cobrar.numero_documento }}</a></td>{% endif %}
+                <td>{{ pago.monto|clp }}</td><td>{{ pago.get_metodo_pago_display }}</td>
+                <td>{% if pago.usuario %}{{ pago.usuario.get_username }}{% else %}Sin responsable registrado{% endif %}</td>
+                <td>{% if pago.sesion_caja_id %}#{{ pago.sesion_caja_id }}{% else %}Sin sesión registrada{% endif %}</td>
+                <td class="text-break">{{ pago.referencia|default:"—" }}</td><td class="text-break">{{ pago.notas|default:"—" }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="{% if mostrar_documento %}8{% else %}7{% endif %}">Aún no hay abonos.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+{% if mas_pagos %}<a class="btn btn-sm btn-outline-secondary" href="{{ mas_pagos }}#historial-abonos">Abonos anteriores</a>{% endif %}
