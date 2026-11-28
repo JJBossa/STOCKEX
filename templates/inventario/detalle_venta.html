@@ -64,9 +64,11 @@
                                 </td>
                                 <td>${{ item.precio_unitario|floatformat:0 }}</td>
                                 <td><strong>${{ item.subtotal|floatformat:0 }}</strong></td>
-                                <td>{{ item.stock_anterior }}</td>
+                                <td>{{ item.stock_anterior|default_if_none:"—" }}</td>
                                 <td>
-                                    {% if item.stock_despues < item.stock_anterior %}
+                                    {% if item.stock_despues is None %}
+                                    —
+                                    {% elif item.stock_despues < item.stock_anterior %}
                                     <span class="badge bg-warning">{{ item.stock_despues }}</span>
                                     {% else %}
                                     <span class="badge bg-success">{{ item.stock_despues }}</span>

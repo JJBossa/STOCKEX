@@ -6,6 +6,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import F
+from django.db.models.deletion import ProtectedError
 from django_filters.rest_framework import DjangoFilterBackend
 from typing import Optional
 
@@ -72,8 +73,19 @@ class ProductoViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(activo=True)
         
         return queryset
-    
-    @action(detail=True, methods=['post'], permission_classes=[PermisoAccionAdministrativa])
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"error": "El producto tiene ventas asociadas."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+    @action(
+        detail=True, methods=["post"], permission_classes=[PermisoAccionAdministrativa]
+    )
     def actualizar_stock(self, request, pk: Optional[int] = None) -> Response:
         """
         Endpoint para actualizar stock de un producto.
@@ -85,10 +97,9 @@ class ProductoViewSet(viewsets.ModelViewSet):
         
         if cantidad is None:
             return Response(
-                {'error': 'Cantidad requerida'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Cantidad requerida"}, status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             cantidad = int(cantidad)
             stock_anterior = producto.stock
@@ -129,7 +140,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 class VentaViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet para consultar ventas (solo lectura)
-    El registro de ventas está suspendido.
+    El registro de ventas se realiza en /pos/registrar-venta/.
     """
     queryset = Venta.objects.all().select_related('usuario').prefetch_related('items')
     serializer_class = VentaSerializer
