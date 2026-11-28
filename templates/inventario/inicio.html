@@ -30,9 +30,11 @@
             <a href="{% url 'dashboard' %}" class="btn btn-info btn-sm">
                 <i class="bi bi-speedometer2"></i> Dashboard
             </a>
+            {% if perms.inventario.registrar_venta %}
             <a href="{% url 'punto_venta' %}" class="btn btn-success btn-sm">
                 <i class="bi bi-cash-register"></i> Punto de Venta
             </a>
+            {% endif %}
             <a href="{% url 'agregar_producto' %}" class="btn btn-primary btn-sm">
                 <i class="bi bi-plus-circle"></i> Agregar Producto
             </a>
@@ -53,11 +55,13 @@
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0">
+                    {% if perms.inventario.registrar_venta %}
                     <li class="mb-2">
                         <a href="{% url 'punto_venta' %}" class="text-decoration-none">
                             <i class="bi bi-cash-register text-success"></i> Punto de Venta
                         </a>
                     </li>
+                    {% endif %}
                     <li class="mb-2">
                         <a href="{% url 'listar_ventas' %}" class="text-decoration-none">
                             <i class="bi bi-clock-history text-primary"></i> Historial de Ventas

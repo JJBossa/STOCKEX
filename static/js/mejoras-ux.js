@@ -82,6 +82,7 @@ function initAutocompletado() {
     const searchInputs = document.querySelectorAll('input[type="text"][placeholder*="Buscar"], input[type="search"]');
     
     searchInputs.forEach(input => {
+        if (input.closest('[data-buscador-manual]')) return;
         let timeoutId = null;
         let autocompleteContainer = null;
         
@@ -327,7 +328,8 @@ function initAccesibilidad() {
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', accesibilidadHTML);
+    const destino = document.querySelector('[data-controles-accesibilidad]') || document.body;
+    destino.insertAdjacentHTML('beforeend', accesibilidadHTML);
     
     // Tamaño de fuente
     let fontSize = parseInt(localStorage.getItem('fontSize')) || 100;

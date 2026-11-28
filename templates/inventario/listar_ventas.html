@@ -13,9 +13,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-receipt text-primary"></i> {% if es_admin %}Historial de Ventas{% else %}Mis Ventas{% endif %}</h2>
     <div>
+        {% if perms.inventario.registrar_venta %}
         <a href="{% url 'punto_venta' %}" class="btn btn-success me-2">
-            <i class="bi bi-cash-register"></i> Consultar POS
+            <i class="bi bi-cash-register"></i> Punto de venta
         </a>
+        {% endif %}
         <a href="{% url 'inicio' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>

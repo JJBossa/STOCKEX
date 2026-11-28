@@ -38,12 +38,12 @@ export function buscarProductos(indice, consulta) {
     return grupos.flat().slice(0, LIMITE);
 }
 
-export function montarBuscador(raiz) {
+export function montarBuscador(raiz, {enlaceDetalle = true, limpiarTrasElegir = false} = {}) {
     const entrada = raiz.querySelector("[data-consulta]");
     const lista = raiz.querySelector("[data-resultados]");
     const estado = raiz.querySelector("[data-estado]");
     const reintentar = raiz.querySelector("[data-reintentar]");
-    const seleccion = raiz.querySelector("[data-seleccion]");
+    const seleccion = enlaceDetalle ? raiz.querySelector("[data-seleccion]") : null;
     let indice = null, etag = null, pendiente = null, ultimoIntento = 0;
     let resultados = [], activo = -1, abierto = false;
 
@@ -103,6 +103,11 @@ export function montarBuscador(raiz) {
 
     function elegir(producto) {
         cerrar();
+        if (limpiarTrasElegir) {
+            entrada.value = "";
+            resultados = [];
+            lista.replaceChildren();
+        }
         if (seleccion && raiz.dataset.detalle) {
             seleccion.href = raiz.dataset.detalle.replace(/0\/$/, `${producto.id}/`);
             seleccion.textContent = `Ver ${producto.nombre}`;
@@ -148,6 +153,7 @@ export function montarBuscador(raiz) {
             etag = respuesta.headers.get("ETag");
             if (seleccion) seleccion.hidden = true;
             renderizar();
+            raiz.dispatchEvent(new Event("catalogo-actualizado"));
         } catch (error) {
             if (!control.signal.aborted) {
                 limpiarCatalogo();
@@ -175,7 +181,8 @@ export function montarBuscador(raiz) {
             cerrar();
         } else if (evento.key === "Enter") {
             evento.preventDefault();
-            if (abierto && resultados.length) elegir(resultados[activo < 0 ? 0 : activo]);
+            if (!evento.ctrlKey && !evento.altKey && !evento.shiftKey && !evento.metaKey
+                && abierto && resultados.length) elegir(resultados[activo < 0 ? 0 : activo]);
         } else if (["ArrowDown", "ArrowUp"].includes(evento.key) && resultados.length) {
             evento.preventDefault();
             abierto = true;
@@ -211,7 +218,9 @@ export function montarBuscador(raiz) {
     });
     window.setInterval(revalidar, INTERVALO);
     actualizar();
-    return {actualizar};
+    return {actualizar, productoPorId: id => indice?.find(({producto}) => producto.id === id)?.producto};
 }
 
-document.querySelectorAll("[data-buscador-productos]").forEach(montarBuscador);
+document.querySelectorAll("[data-buscador-productos]").forEach(raiz => {
+    if (!raiz.closest("[data-buscador-manual]")) montarBuscador(raiz);
+});

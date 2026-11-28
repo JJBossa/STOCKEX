@@ -29,7 +29,7 @@
             <div class="navbar-nav ms-auto d-flex align-items-center">
                 <!-- Botón de Ventas - Grande y Visible (solo para usuarios no-admin) -->
                 {% if not es_administrador_nav %}
-                {% if perms.inventario.view_venta %}
+                {% if perms.inventario.registrar_venta %}
                 <a href="{% url 'punto_venta' %}" class="btn btn-success btn-lg me-3" style="font-weight: 600; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
                     <i class="bi bi-cash-register"></i> {% if t %}{{ t.Ventas }}{% else %}Ventas{% endif %}
                 </a>
@@ -42,7 +42,9 @@
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><h6 class="dropdown-header">Ventas</h6></li>
+                        {% if perms.inventario.registrar_venta %}
                         <li><a class="dropdown-item" href="{% url 'punto_venta' %}"><i class="bi bi-cash-register text-success"></i> Punto de Venta</a></li>
+                        {% endif %}
                         <li><a class="dropdown-item" href="{% url 'listar_ventas' %}"><i class="bi bi-clock-history text-primary"></i> Historial</a></li>
                         <li><a class="dropdown-item" href="{% url 'listar_cotizaciones' %}"><i class="bi bi-file-earmark-text text-info"></i> Cotizaciones</a></li>
                         <li><a class="dropdown-item" href="{% url 'listar_cuentas_cobrar' %}"><i class="bi bi-credit-card text-danger"></i> Cuentas por Cobrar</a></li>

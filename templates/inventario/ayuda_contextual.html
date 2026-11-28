@@ -73,51 +73,6 @@ const ayudaPorPagina = {
             <p>Cambia entre vista de cuadrícula (grid) o lista según tu preferencia.</p>
         `
     },
-    'punto_venta': {
-        titulo: 'Punto de Venta (POS)',
-        contenido: `
-            <h6><i class="bi bi-cash-register"></i> Sistema de Ventas</h6>
-            <p>Aquí puedes procesar ventas rápidamente usando un lector de código de barras o búsqueda manual.</p>
-            
-            <h6 class="mt-3"><i class="bi bi-upc-scan"></i> Escanear Código</h6>
-            <ul>
-                <li>Usa un lector de código de barras USB conectado a tu PC</li>
-                <li>O escribe el código manualmente en el campo</li>
-                <li>El producto se agregará automáticamente al carrito</li>
-                <li><strong>Atajos:</strong> F1 (Nueva venta), F2 (Procesar), F3 (Enfocar campo)</li>
-            </ul>
-            
-            <h6 class="mt-3"><i class="bi bi-cart-plus"></i> Agregar Productos</h6>
-            <ul>
-                <li>Escanea el código de barras del producto</li>
-                <li>O busca el producto manualmente y haz clic en él</li>
-                <li>Los productos recientes aparecen abajo para acceso rápido</li>
-                <li>Puedes modificar la cantidad con los botones + y -</li>
-            </ul>
-            
-            <h6 class="mt-3"><i class="bi bi-percent"></i> Descuentos</h6>
-            <ul>
-                <li>Puedes aplicar descuentos en <strong>monto fijo ($)</strong> o <strong>porcentaje (%)</strong></li>
-                <li>Selecciona el tipo con los botones $ o %</li>
-                <li>Ingresa el valor del descuento</li>
-                <li>El total se actualiza automáticamente</li>
-            </ul>
-            
-            <h6 class="mt-3"><i class="bi bi-credit-card"></i> Procesar Venta</h6>
-            <ol>
-                <li>Agrega todos los productos al carrito</li>
-                <li>Selecciona el método de pago (Efectivo, Tarjeta, Transferencia o Mixto)</li>
-                <li>Si es efectivo, ingresa el monto recibido</li>
-                <li>El <strong>vuelto</strong> se calcula automáticamente y se muestra en grande</li>
-                <li>Haz clic en <strong>"Procesar"</strong> para finalizar la venta</li>
-                <li>Después de procesar, podrás imprimir el ticket si lo deseas</li>
-            </ol>
-            
-            <div class="alert alert-info mt-3">
-                <i class="bi bi-info-circle"></i> <strong>Tip:</strong> El carrito se limpia automáticamente después de cada venta para que puedas iniciar una nueva rápidamente.
-            </div>
-        `
-    },
     'dashboard': {
         titulo: 'Dashboard Administrativo',
         contenido: `
@@ -390,9 +345,7 @@ function cargarAyuda() {
     let pagina = 'inicio'; // Por defecto
     
     // Identificar la página actual
-    if (path.includes('/pos/') || path.includes('punto_venta')) {
-        pagina = 'punto_venta';
-    } else if (path.includes('/dashboard/') && !path.includes('usuario')) {
+    if (path.includes('/dashboard/') && !path.includes('usuario')) {
         pagina = 'dashboard';
     } else if (path.includes('/dashboard-usuario/')) {
         pagina = 'dashboard_usuario';
