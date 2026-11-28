@@ -64,7 +64,9 @@
                         <li><a class="dropdown-item" href="{% url 'caja_historial' %}"><i class="bi bi-cash-stack text-success" aria-hidden="true"></i> Caja</a></li>
                         {% endif %}
                         <li><a class="dropdown-item" href="{% url 'listar_cotizaciones' %}"><i class="bi bi-file-earmark-text text-info"></i> Cotizaciones</a></li>
+                        {% if perms.inventario.consultar_cuentas_por_cobrar %}
                         <li><a class="dropdown-item" href="{% url 'listar_cuentas_cobrar' %}"><i class="bi bi-credit-card text-danger"></i> Cuentas por Cobrar</a></li>
+                        {% endif %}
                         <li><hr class="dropdown-divider"></li>
                         <li><h6 class="dropdown-header">Inventario</h6></li>
                         <li><a class="dropdown-item" href="{% url 'agregar_producto' %}"><i class="bi bi-plus-circle text-primary"></i> Agregar Producto</a></li>

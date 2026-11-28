@@ -7,7 +7,8 @@ from django.http import Http404
 
 from .access import ventas_visibles
 from .bloqueo_caja import bloquear_caja, invalidar_resumen, sqlite_ocupado
-from .models import AnulacionVenta, Cotizacion, Venta
+from .fiados import cuentas_auditadas
+from .models import AnulacionVenta, Cotizacion, CuentaPorCobrar, Venta
 from .registro_ventas import METODOS_PAGO
 
 PERMISO_ANULAR_VENTA = "inventario.anular_venta"
@@ -33,22 +34,49 @@ def tiene_permiso_anulacion(usuario):
     )
 
 
-def impedimento_anulacion(venta):
-    """Reglas que el servicio vuelve a evaluar bajo bloqueo."""
+def evaluar_anulacion(venta):
+    """Devuelve el impedimento o la deuda que debe cancelarse con la venta."""
     if venta.cancelada:
-        return "La venta ya fue anulada."
+        return "La venta ya fue anulada.", None
     if venta.sesion_caja_id and venta.sesion_caja.cerrada_en is not None:
-        return "La sesión de caja de esta venta está cerrada."
-    if venta.es_credito or venta.metodo_pago not in METODOS_PAGO:
-        return "El método de pago requiere una reversa financiera aún no disponible."
+        return "La sesión de caja de esta venta está cerrada.", None
+    cuenta = None
+    if venta.es_credito or venta.metodo_pago == "credito":
+        if (
+            not venta.es_credito
+            or venta.metodo_pago != "credito"
+            or not venta.sesion_caja_id
+            or not venta.cliente_id
+            or venta.monto_recibido != 0
+            or venta.cambio != 0
+        ):
+            return "La venta fiada requiere una conciliación financiera.", None
+        cuenta = (
+            cuentas_auditadas(venta.cuenta_por_cobrar.all())
+            .filter(fiado_seguro=True)
+            .first()
+        )
+        if cuenta is None or cuenta.inconsistente or cuenta.monto_total != venta.total:
+            return (
+                "La cuenta de la venta fiada requiere una conciliación financiera.",
+                None,
+            )
+        if cuenta.estado != "pendiente":
+            return "La venta fiada tiene abonos confirmados.", None
+    elif venta.metodo_pago not in METODOS_PAGO:
+        return (
+            "El método de pago requiere una reversa financiera aún no disponible.",
+            None,
+        )
     if (
-        venta.cuenta_por_cobrar.exists()
+        (cuenta is None and venta.cuenta_por_cobrar.exists())
         or venta.devoluciones.exists()
         or venta.movimientos_lote.exists()
         or Cotizacion.objects.filter(convertida_en_venta=venta).exists()
     ):
         return (
-            "La venta tiene registros vinculados que requieren una reversa coordinada."
+            "La venta tiene registros vinculados que requieren una reversa coordinada.",
+            None,
         )
     con_stock = venta.items.filter(
         Q(stock_anterior__isnull=False) | Q(stock_despues__isnull=False)
@@ -58,8 +86,15 @@ def impedimento_anulacion(venta):
         | Q(stock_despues__isnull=True)
         | ~Q(stock_anterior=F("stock_despues"))
     ).exists():
-        return "La venta histórica registra un cambio de stock o datos de stock incompletos."
-    return None
+        return (
+            "La venta histórica registra un cambio de stock o datos de stock incompletos.",
+            None,
+        )
+    return None, cuenta
+
+
+def impedimento_anulacion(venta):
+    return evaluar_anulacion(venta)[0]
 
 
 def normalizar_motivo(motivo):
@@ -97,7 +132,7 @@ def anular_venta(usuario, venta_id, motivo):
                 raise ErrorAnulacion(
                     "ya_anulada", "La venta ya fue anulada. Consulta el detalle.", 409
                 )
-            impedimento = impedimento_anulacion(venta)
+            impedimento, cuenta = evaluar_anulacion(venta)
             if impedimento:
                 raise ErrorAnulacion("no_anulable", impedimento, 409)
             venta.cancelada = True
@@ -105,6 +140,8 @@ def anular_venta(usuario, venta_id, motivo):
             anulacion = AnulacionVenta.objects.create(
                 venta=venta, usuario=usuario, motivo=motivo
             )
+            if cuenta is not None:
+                CuentaPorCobrar.objects.filter(pk=cuenta.pk).update(estado="cancelado")
             if venta.sesion_caja_id is not None:
                 invalidar_resumen(venta.sesion_caja_id)
             return ResultadoAnulacion(anulacion, repetida=False)

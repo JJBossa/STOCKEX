@@ -18,6 +18,7 @@ from .models import (
     Cliente, CuentaPorCobrar, Almacen, OrdenCompra
 )
 from .utils import es_administrador
+from .historial_ventas import SANTIAGO
 
 @login_required
 def reportes_avanzados(request):
@@ -162,22 +163,34 @@ def reportes_avanzados(request):
         top_clientes.append(cliente_dict)
     
     # Clientes con saldo pendiente
-    clientes_saldo = Cliente.objects.filter(
-        activo=True
-    ).annotate(
-        saldo=Sum('cuentas_por_cobrar__monto_total') - Sum('cuentas_por_cobrar__monto_pagado')
-    ).filter(saldo__gt=0).order_by('-saldo')[:10]
-    
+    clientes_saldo = (
+        Cliente.objects.filter(activo=True)
+        .annotate(
+            saldo=Sum(
+                F("cuentas_por_cobrar__monto_total")
+                - F("cuentas_por_cobrar__monto_pagado"),
+                filter=Q(
+                    cuentas_por_cobrar__estado__in=CuentaPorCobrar.ESTADOS_PENDIENTES
+                ),
+            )
+        )
+        .filter(saldo__gt=0)
+        .order_by("-saldo")[:10]
+    )
+
     # ========== ANÁLISIS DE CUENTAS POR COBRAR ==========
     cuentas_pendientes = CuentaPorCobrar.objects.filter(
-        estado__in=['pendiente', 'parcial']
+        estado__in=CuentaPorCobrar.ESTADOS_PENDIENTES
     )
-    total_pendiente = cuentas_pendientes.aggregate(
-        total=Sum('monto_total') - Sum('monto_pagado')
-    )['total'] or 0
-    
+    total_pendiente = (
+        cuentas_pendientes.aggregate(total=Sum("monto_total") - Sum("monto_pagado"))[
+            "total"
+        ]
+        or 0
+    )
+
     cuentas_vencidas = cuentas_pendientes.filter(
-        fecha_vencimiento__lt=timezone.now().date()
+        fecha_vencimiento__lt=timezone.localdate(timezone=SANTIAGO)
     )
     total_vencido = cuentas_vencidas.aggregate(
         total=Sum('monto_total') - Sum('monto_pagado')

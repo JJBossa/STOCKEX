@@ -6,6 +6,7 @@ from django.views.decorators.http import require_POST
 
 from .access import permiso_requerido
 from .bloqueo_caja import sqlite_ocupado
+from .caja import ErrorCaja
 from .peticion_financiera import ErrorJSON, comprobar_cuenta, leer_json
 from .registro_ventas import (
     PERMISO_REGISTRAR_VENTA,
@@ -27,7 +28,7 @@ def registrar_venta_pos(request):
         )
     except ErrorJSON as error:
         return JsonResponse({"error": error.codigo}, status=error.estado)
-    except ErrorRegistroVenta as error:
+    except (ErrorRegistroVenta, ErrorCaja) as error:
         return JsonResponse(error.datos, status=error.estado)
     except OperationalError as error:
         if not sqlite_ocupado(error):
@@ -51,6 +52,16 @@ def registrar_venta_pos(request):
             "metodo_pago": venta.metodo_pago,
             "monto_recibido": int(venta.monto_recibido),
             "cambio": int(venta.cambio),
+            **(
+                {
+                    "cliente_id": venta.cliente_id,
+                    "cuenta_id": resultado.cuenta_id,
+                    "es_credito": True,
+                    "sesion_caja_id": venta.sesion_caja_id,
+                }
+                if resultado.cuenta_id
+                else {}
+            ),
             "items": [
                 {
                     "producto_id": item.producto_id,

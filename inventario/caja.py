@@ -4,7 +4,8 @@ from datetime import date, timedelta
 
 from django.core.exceptions import PermissionDenied
 from django.db import OperationalError, transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import BigIntegerField, Count, Q, Sum
+from django.db.models.functions import Cast
 from django.utils import timezone
 
 from .bloqueo_caja import (
@@ -14,7 +15,7 @@ from .bloqueo_caja import (
     sqlite_ocupado,
 )
 from .historial_ventas import inicio_dia_chileno, resumir_ventas
-from .models import MovimientoCaja, SesionCaja
+from .models import MovimientoCaja, PagoCliente, SesionCaja
 from .peticion_financiera import uuid_v4
 
 CONSULTAR_CAJA = "inventario.consultar_caja"
@@ -39,7 +40,7 @@ class ErrorCaja(Exception):
 
 @dataclass(frozen=True)
 class ResultadoCaja:
-    registro: SesionCaja | MovimientoCaja
+    registro: SesionCaja | MovimientoCaja | PagoCliente
     repetida: bool = False
 
 
@@ -203,6 +204,25 @@ def resumir_caja(sesion):
         pago.metodo: {"cantidad": pago.cantidad, "importe": pago.total}
         for pago in ventas.pagos
     }
+    metodos = PagoCliente.METODOS_ABONO
+    abonos = {metodo: {"cantidad": 0, "importe": 0} for metodo in metodos}
+    for total in (
+        sesion.abonos.order_by()
+        .values("metodo_pago")
+        .annotate(cantidad=Count("pk"), importe=Sum(Cast("monto", BigIntegerField())))
+    ):
+        abonos[total["metodo_pago"]] = {
+            "cantidad": total["cantidad"],
+            "importe": total["importe"],
+        }
+    recibido = {
+        metodo: {
+            "ventas_directas": pagos[metodo]["importe"],
+            "abonos": abonos[metodo]["importe"],
+            "total": pagos[metodo]["importe"] + abonos[metodo]["importe"],
+        }
+        for metodo in metodos
+    }
     ingresos = Q(tipo=MovimientoCaja.Tipo.INGRESO)
     retiros = Q(tipo=MovimientoCaja.Tipo.RETIRO)
     movimientos = sesion.movimientos.aggregate(
@@ -213,7 +233,7 @@ def resumir_caja(sesion):
     )
     esperado = (
         sesion.efectivo_inicial
-        + pagos["efectivo"]["importe"]
+        + recibido["efectivo"]["total"]
         + movimientos["ingresos"]
         - movimientos["retiros"]
     )
@@ -222,6 +242,17 @@ def resumir_caja(sesion):
         "cantidad_vigente": ventas.cantidad_vigente,
         "total_vigente": ventas.total_vigente,
         "por_metodo": pagos,
+        "fiados": pagos["credito"],
+        "ventas_directas": {
+            campo: sum(pagos[m][campo] for m in metodos)
+            for campo in ("cantidad", "importe")
+        },
+        "abonos": {
+            campo: sum(x[campo] for x in abonos.values())
+            for campo in ("cantidad", "importe")
+        }
+        | {"por_metodo": abonos},
+        "recibido_por_metodo": recibido,
         "cantidad_anulada": ventas.cantidad_anulada,
         "monto_anulado": ventas.monto_anulado,
         **movimientos,

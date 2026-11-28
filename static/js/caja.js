@@ -46,6 +46,18 @@ function cuerpoValido(operacion, datos) {
     return datos.tipo === operacion && entero(datos.importe, 1) && esTexto(datos.motivo);
 }
 
+function cobrosValidos(resumen) {
+    const {fiados, ventas_directas, abonos, recibido_por_metodo} = resumen;
+    if ([fiados, ventas_directas, abonos, recibido_por_metodo].every(item => item === undefined)) return true;
+    const totalesValidos = item => Number.isInteger(item?.importe) && Number.isInteger(item.cantidad);
+    return [fiados, ventas_directas, abonos].every(totalesValidos)
+        && ["efectivo", "tarjeta", "transferencia"].every(metodo => {
+            const cobro = recibido_por_metodo?.[metodo];
+            return totalesValidos(abonos.por_metodo?.[metodo])
+                && [cobro?.ventas_directas, cobro?.abonos, cobro?.total].every(Number.isInteger);
+        });
+}
+
 function confirmacionValida(resultado, status, cuenta, pendiente) {
     const {operacion, sesion, cuerpo} = pendiente;
     const pedido = JSON.parse(cuerpo);
@@ -70,6 +82,7 @@ function confirmacionValida(resultado, status, cuenta, pendiente) {
             && ["efectivo", "tarjeta", "transferencia", "credito", "mixto"].every(metodo =>
                 Number.isInteger(r.por_metodo?.[metodo]?.importe) && Number.isInteger(r.por_metodo[metodo].cantidad)
             )
+            && cobrosValidos(r)
             && r.clasificacion === clasificar(BigInt(r.diferencia));
     }
     return String(resultado.sesion_id) === sesion && String(resultado.usuario_id) === cuenta
