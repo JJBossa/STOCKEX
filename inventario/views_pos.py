@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.http import require_POST, require_safe
+from django.views.decorators.http import require_GET, require_POST, require_safe
 from django.views.decorators.vary import vary_on_headers
 from .anulacion_ventas import (
     MAX_MOTIVO,
@@ -15,8 +15,10 @@ from .anulacion_ventas import (
     impedimento_anulacion,
     tiene_permiso_anulacion,
 )
+from .bloqueo_caja import sesion_activa
 from .historial_ventas import FiltrosHistorialVentas, resumir_ventas
 from .models import Producto
+from .peticion_financiera import comprobar_cuenta
 from .registro_ventas import PERMISO_REGISTRAR_VENTA
 from .utils import es_administrador
 from .access import (
@@ -30,7 +32,19 @@ from .access import (
 @permiso_requerido(PERMISO_REGISTRAR_VENTA)
 @require_safe
 def punto_venta(request):
-    return render(request, "inventario/punto_venta.html")
+    return render(
+        request,
+        "inventario/punto_venta.html",
+        {"caja_abierta": sesion_activa().exists()},
+    )
+
+
+@never_cache
+@permiso_requerido(PERMISO_REGISTRAR_VENTA)
+@require_GET
+def estado_caja_pos(request):
+    comprobar_cuenta(request)
+    return JsonResponse({"abierta": sesion_activa().exists()})
 
 @permiso_requerido('inventario.view_venta')
 def buscar_producto_pos(request):

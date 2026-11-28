@@ -10,7 +10,9 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.mark.parametrize("rol", ["Administrador", "Vendedor"])
-def test_pos_disponible_para_roles_de_venta(client, normal_user, producto, rol):
+def test_pos_disponible_para_roles_de_venta(
+    client, normal_user, producto, rol, caja_abierta
+):
     call_command("crear_grupos_permisos", stdout=StringIO())
     normal_user.groups.add(Group.objects.get(name=rol))
     client.force_login(normal_user)

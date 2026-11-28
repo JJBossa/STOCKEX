@@ -1,0 +1,13 @@
+{% extends "inventario/caja/base.html" %}
+{% block title %}Consulta de caja - STOCKEX{% endblock %}
+{% block content %}
+<section class="caja-vista">
+    <h1>Consulta de caja</h1>
+    <p role="alert">{{ mensaje }}</p>
+    {% if perms.inventario.consultar_caja or perms.inventario.abrir_caja %}
+    <a class="btn btn-outline-secondary" href="{% url 'caja_gestion' %}">Caja actual</a>
+    {% elif perms.inventario.consultar_cierres_caja %}
+    <a class="btn btn-outline-secondary" href="{% url 'caja_historial' %}">Historial de cierres</a>
+    {% endif %}
+</section>
+{% endblock %}

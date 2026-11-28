@@ -10,6 +10,7 @@
 {% block content %}
 <section class="pos" data-punto-venta data-usuario="{{ request.user.pk }}"
          data-registro="{% url 'registrar_venta_pos' %}"
+         data-estado-caja="{% url 'pos_estado_caja' %}" data-caja-abierta="{{ caja_abierta|yesno:'true,false' }}"
          data-modulo-buscador="{% static 'js/buscador-productos.js' %}">
     <header class="pos-cabecera">
         <h1>Punto de venta</h1>
@@ -25,6 +26,17 @@
     </header>
 
     <noscript><p class="alert alert-warning">Habilita JavaScript para registrar ventas.</p></noscript>
+    <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+        <strong id="pos-estado-caja" role="status">{% if caja_abierta %}Caja abierta{% else %}Caja cerrada{% endif %}</strong>
+        <span id="pos-caja-cerrada" {% if caja_abierta %}hidden{% endif %}>
+            {% if perms.inventario.abrir_caja %}
+            <a href="{% url 'caja_gestion' %}">Ir a apertura</a> para registrar una venta nueva.
+            {% else %}
+            Solicita al responsable que abra la caja para registrar una venta nueva.
+            {% endif %}
+        </span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" id="pos-actualizar-caja" hidden>Consultar estado de caja</button>
+    </div>
     <p class="pos-aviso" id="pos-error" role="alert" tabindex="-1"></p>
     <p class="pos-aviso pos-aviso-info" id="pos-estado" role="status"></p>
     <p id="pos-sesion" hidden><a href="{% url 'punto_venta' %}">Volver a abrir el punto de venta</a></p>

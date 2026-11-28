@@ -208,8 +208,13 @@ def registrar_venta(usuario, clave, datos):
                 usuario=usuario, clave=clave, huella=huella
             )
             reserva_creada = True
-            # Compatibilidad STK-06A: el POS aún puede registrar sin sesión abierta.
             sesion_id = sesion_activa().values_list("pk", flat=True).first()
+            if sesion_id is None:
+                raise ErrorRegistroVenta(
+                    "caja_no_abierta",
+                    "Abre la caja antes de registrar una venta nueva.",
+                    estado=409,
+                )
             items = (
                 preparar_items(datos["items"])
                 if modalidad == Venta.Modalidad.DETALLADA
@@ -240,8 +245,7 @@ def registrar_venta(usuario, clave, datos):
                 ItemVenta.objects.bulk_create(items)
             registro.venta = venta
             registro.save(update_fields=["venta"])
-            if sesion_id is not None:
-                invalidar_resumen(sesion_id)
+            invalidar_resumen(sesion_id)
             return ResultadoRegistroVenta(venta, items)
     except IntegrityError:
         if reserva_creada:

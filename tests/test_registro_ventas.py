@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from inventario.caja import abrir_caja
 from inventario.models import (
     BloqueoCaja,
     Cliente,
@@ -37,7 +38,7 @@ def vendedor(django_user_model):
 
 
 @pytest.fixture
-def pos(client, vendedor):
+def pos(client, vendedor, caja_abierta):
     client.force_login(vendedor)
     return client
 
@@ -320,7 +321,9 @@ def test_rollback_despues_de_insertar_un_item(pos, producto, monkeypatch):
     assert ItemVenta.objects.count() == 2
 
 
-def test_endpoint_permisos_post_csrf_y_tipo_de_contenido(vendedor, normal_user):
+def test_endpoint_permisos_post_csrf_y_tipo_de_contenido(
+    vendedor, normal_user, caja_abierta
+):
     client = Client(enforce_csrf_checks=True)
     ruta = reverse("registrar_venta_pos")
     solicitud = RequestFactory().get(ruta)
@@ -352,7 +355,7 @@ def test_campos_de_servidor_no_se_pueden_imponer(pos, campo):
 
 
 def test_ventas_historicas_y_relaciones_se_conservan(
-    client, admin_user, vendedor, producto
+    client, admin_user, vendedor, producto, caja_abierta
 ):
     cliente = Cliente.objects.create(nombre="Cliente histórico")
     historica = Venta.objects.create(
@@ -411,7 +414,9 @@ def test_ventas_historicas_y_relaciones_se_conservan(
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("escenario", ["distintas", "misma", "conflicto"])
-def test_concurrencia_de_registro_real_en_postgresql(vendedor, producto, escenario):
+def test_concurrencia_de_registro_real_en_postgresql(
+    vendedor, producto, escenario, caja_abierta
+):
     if connection.vendor != "postgresql":
         pytest.skip("Requiere PostgreSQL y dos conexiones independientes.")
     BloqueoCaja.objects.get_or_create(pk=1)
@@ -482,7 +487,7 @@ def test_concurrencia_de_registro_real_en_postgresql(vendedor, producto, escenar
     ],
 )
 def test_registro_observa_cambio_concurrente_de_catalogo_en_postgresql(
-    vendedor, producto, cambio, error
+    vendedor, producto, cambio, error, caja_abierta
 ):
     if connection.vendor != "postgresql":
         pytest.skip("Requiere bloqueos de fila de PostgreSQL.")
@@ -555,6 +560,7 @@ def test_migracion_avance_y_reversion_con_ventas(client, admin_user, producto):
         }
         assert ItemVenta.objects.values().get(venta_id=historica.pk) == item_guardado
         MigrationExecutor(connection).migrate(esquema_inicial)
+        abrir_caja(admin_user, str(uuid4()), {"efectivo_inicial": 0})
         client.force_login(admin_user)
         respuesta = enviar(client, detallada(linea(producto)))
         assert respuesta.status_code == 201

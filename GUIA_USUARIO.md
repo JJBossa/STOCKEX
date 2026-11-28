@@ -5,14 +5,15 @@
 2. [Dashboard](#dashboard)
 3. [Gestión de Productos](#gestión-de-productos)
 4. [Punto de Venta (POS)](#punto-de-venta-pos)
-5. [Ventas](#ventas)
-6. [Clientes](#clientes)
-7. [Cotizaciones](#cotizaciones)
-8. [Almacenes](#almacenes)
-9. [Compras](#compras)
-10. [Reportes](#reportes)
-11. [Búsqueda Global](#búsqueda-global)
-12. [Notificaciones](#notificaciones)
+5. [Caja](#caja)
+6. [Ventas](#ventas)
+7. [Clientes](#clientes)
+8. [Cotizaciones](#cotizaciones)
+9. [Almacenes](#almacenes)
+10. [Compras](#compras)
+11. [Reportes](#reportes)
+12. [Búsqueda Global](#búsqueda-global)
+13. [Notificaciones](#notificaciones)
 
 ---
 
@@ -78,6 +79,8 @@ El dashboard muestra:
 
 ## Punto de Venta (POS)
 
+Comprueba el estado de caja antes de registrar. Si está cerrada, solicita la apertura al responsable o usa **Ir a apertura** si tienes permiso. Pulsa **Consultar estado de caja** para verificar la apertura sin perder lo que ingresaste. Las ventas pendientes se pueden recuperar aunque la caja esté cerrada.
+
 ### Registrar una venta rápida
 
 1. Abre el punto de venta e ingresa el monto entero en CLP.
@@ -91,6 +94,17 @@ El dashboard muestra:
 3. Elige el medio de pago y registra la operación. Si cambiaron los precios, revisa el nuevo total y acéptalo antes de registrar.
 
 Usa **Ctrl+Enter** para registrar cuando el foco esté en el formulario, fuera del buscador. Si la respuesta queda pendiente, reintenta desde la misma pestaña y cuenta. Consulta el [flujo de recuperación](docs/funcionalidades/STK_04B_INTERFAZ_PUNTO_VENTA.md).
+
+---
+
+## Caja
+
+1. En **Menú → Caja**, escribe el efectivo inicial en pesos enteros, incluso si es $0, y pulsa **Abrir caja**. Al ver la sesión abierta, puedes ir al punto de venta.
+2. Durante la jornada, registra cada **Ingreso** o **Retiro** con su importe y motivo. Pulsa **Actualizar** para consultar las últimas ventas y **Ver movimientos** para revisar los registros. El total vendido incluye todos los medios de pago. El efectivo esperado es el saldo teórico de la caja.
+3. Al terminar, anota el efectivo contado en **Conciliación y cierre**. Si hay faltante o sobrante, explica la diferencia. Pulsa **Revisar cierre** y luego **Confirmar cierre**. Si las cifras cambian entre ambos pasos, revisa el nuevo resumen y confirma nuevamente.
+4. Desde **Historial de cierres** puedes filtrar por fecha y clasificación, abrir el detalle y consultar los movimientos. El cierre es permanente. Desde ese momento quedan bloqueados los movimientos y las anulaciones de esa sesión.
+
+Si una operación queda sin confirmar, usa **Reintentar** en la misma pestaña y cuenta. Puedes recargar la página. Si perdiste la pestaña o cambiaste de dispositivo, revisa los registros antes de volver a ingresar la operación.
 
 ---
 

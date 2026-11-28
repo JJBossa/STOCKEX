@@ -159,7 +159,9 @@ def test_movimientos_rechazan_datos_invalidos(cajero, admin_user, datos):
 def test_asociacion_de_dos_vendedores_totales_e_inventario(
     admin_user, cajero, django_user_model, producto
 ):
-    previa = rapida(admin_user, monto=5000)
+    previa = Venta.objects.create(
+        usuario=admin_user, modalidad=Venta.Modalidad.RAPIDA, total=5000
+    )
     historica = Venta.objects.create(total=6000, cancelada=True)
     call_command("crear_grupos_permisos", stdout=StringIO())
     vendedores = [
