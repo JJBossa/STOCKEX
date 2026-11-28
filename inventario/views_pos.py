@@ -140,7 +140,9 @@ def url_historial(parametros, nombre, *args):
 
 def mostrar_detalle_venta(request, venta_id, *, error=None, motivo="", estado=200):
     venta = get_object_or_404(
-        ventas_visibles(request.user).select_related("usuario", "anulacion__usuario"),
+        ventas_visibles(request.user).select_related(
+            "usuario", "anulacion__usuario", "sesion_caja"
+        ),
         id=venta_id,
     )
     autorizada = not venta.cancelada and tiene_permiso_anulacion(request.user)

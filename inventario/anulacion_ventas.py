@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 
 from django.core.exceptions import PermissionDenied
-from django.db import OperationalError, connection, transaction
+from django.db import OperationalError, transaction
 from django.db.models import F, Q
 from django.http import Http404
 
 from .access import ventas_visibles
+from .bloqueo_caja import bloquear_caja, invalidar_resumen, sqlite_ocupado
 from .models import AnulacionVenta, Cotizacion, Venta
 from .registro_ventas import METODOS_PAGO
 
@@ -33,9 +34,11 @@ def tiene_permiso_anulacion(usuario):
 
 
 def impedimento_anulacion(venta):
-    """Reglas que el servicio vuelve a evaluar bajo bloqueo (extensión para STK-06)."""
+    """Reglas que el servicio vuelve a evaluar bajo bloqueo."""
     if venta.cancelada:
         return "La venta ya fue anulada."
+    if venta.sesion_caja_id and venta.sesion_caja.cerrada_en is not None:
+        return "La sesión de caja de esta venta está cerrada."
     if venta.es_credito or venta.metodo_pago not in METODOS_PAGO:
         return "El método de pago requiere una reversa financiera aún no disponible."
     if (
@@ -78,9 +81,7 @@ def anular_venta(usuario, venta_id, motivo):
     visibles = ventas_visibles(usuario)
     try:
         with transaction.atomic():
-            if connection.vendor == "sqlite":
-                # Adquiere el bloqueo de escritor antes de leer, sin tocar ninguna fila.
-                Venta.objects.filter(pk__isnull=True).update(cancelada=F("cancelada"))
+            bloquear_caja()
             try:
                 venta = visibles.select_for_update().get(pk=venta_id)
             except Venta.DoesNotExist as error:
@@ -104,12 +105,11 @@ def anular_venta(usuario, venta_id, motivo):
             anulacion = AnulacionVenta.objects.create(
                 venta=venta, usuario=usuario, motivo=motivo
             )
+            if venta.sesion_caja_id is not None:
+                invalidar_resumen(venta.sesion_caja_id)
             return ResultadoAnulacion(anulacion, repetida=False)
     except OperationalError as error:
-        codigo = getattr(error.__cause__, "sqlite_errorname", "")
-        if connection.vendor == "sqlite" and codigo.startswith(
-            ("SQLITE_BUSY", "SQLITE_LOCKED")
-        ):
+        if sqlite_ocupado(error):
             raise ErrorAnulacion(
                 "base_ocupada",
                 "La base está ocupada. Comprueba el estado y vuelve a intentar.",

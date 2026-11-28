@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from inventario.models import (
+    BloqueoCaja,
     Cliente,
     CuentaPorCobrar,
     ItemVenta,
@@ -413,12 +414,13 @@ def test_ventas_historicas_y_relaciones_se_conservan(
 def test_concurrencia_de_registro_real_en_postgresql(vendedor, producto, escenario):
     if connection.vendor != "postgresql":
         pytest.skip("Requiere PostgreSQL y dos conexiones independientes.")
+    BloqueoCaja.objects.get_or_create(pk=1)
     simultaneas = Barrier(2, timeout=10)
     primera = str(uuid4())
     segunda = str(uuid4()) if escenario == "distintas" else primera
 
     def esperar_escrituras(execute, sql, params, many, context):
-        if sql.startswith('INSERT INTO "inventario_registroventa"'):
+        if 'FROM "inventario_bloqueocaja"' in sql and "FOR UPDATE" in sql:
             simultaneas.wait()
         return execute(sql, params, many, context)
 
@@ -519,6 +521,9 @@ def test_migracion_avance_y_reversion_con_ventas(client, admin_user, producto):
     migracion = MigrationExecutor(connection)
     esquema_inicial = migracion.loader.graph.leaf_nodes()
     apps_anteriores = migracion.loader.project_state(anterior).apps
+    Venta0018 = migracion.loader.project_state(nueva).apps.get_model(
+        "inventario", "Venta"
+    )
     VentaAnterior = apps_anteriores.get_model("inventario", "Venta")
     ItemAnterior = apps_anteriores.get_model("inventario", "ItemVenta")
 
@@ -544,11 +549,12 @@ def test_migracion_avance_y_reversion_con_ventas(client, admin_user, producto):
         item_guardado = ItemAnterior.objects.values().get(venta=historica)
 
         MigrationExecutor(connection).migrate(nueva)
-        assert Venta.objects.values().get(pk=historica.pk) == {
+        assert Venta0018.objects.values().get(pk=historica.pk) == {
             **venta_guardada,
             "modalidad": None,
         }
         assert ItemVenta.objects.values().get(venta_id=historica.pk) == item_guardado
+        MigrationExecutor(connection).migrate(esquema_inicial)
         client.force_login(admin_user)
         respuesta = enviar(client, detallada(linea(producto)))
         assert respuesta.status_code == 201
