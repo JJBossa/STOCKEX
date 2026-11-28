@@ -1,10 +1,12 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.db.models import Sum
 from django.core.paginator import Paginator
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_safe
+from django.views.decorators.vary import vary_on_headers
+from .historial_ventas import FiltrosHistorialVentas, resumir_ventas
 from .models import Producto
 from .registro_ventas import PERMISO_REGISTRAR_VENTA
 from .utils import es_administrador
@@ -76,64 +78,56 @@ def procesar_venta(request):
     return operaciones_financieras_suspendidas()
 
 
-@permiso_requerido('inventario.view_venta')
+@never_cache
+@vary_on_headers("X-Historial-Parcial")
+@permiso_requerido("inventario.view_venta")
+@require_safe
 def listar_ventas(request):
-    """Lista todas las ventas - Usuarios normales solo ven sus propias ventas"""
-    
-    ventas = ventas_visibles(request.user).select_related('usuario').prefetch_related('items')
-    
-    # Filtros
-    fecha_desde = request.GET.get('fecha_desde', '')
-    fecha_hasta = request.GET.get('fecha_hasta', '')
-    metodo_pago = request.GET.get('metodo_pago', '')
-    numero_venta = request.GET.get('numero_venta', '')
-    
-    if fecha_desde:
-        ventas = ventas.filter(fecha__gte=fecha_desde)
-    if fecha_hasta:
-        ventas = ventas.filter(fecha__lte=fecha_hasta)
-    if metodo_pago:
-        ventas = ventas.filter(metodo_pago=metodo_pago)
-    if numero_venta:
-        ventas = ventas.filter(numero_venta__icontains=numero_venta)
-    
-    # Estadísticas
-    total_ventas = ventas.aggregate(Sum('total'))['total__sum'] or 0
-    total_ventas_count = ventas.count()
-    
-    # Paginación
-    paginator = Paginator(ventas, 50)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'ventas': page_obj,
-        'fecha_desde': fecha_desde,
-        'fecha_hasta': fecha_hasta,
-        'metodo_pago': metodo_pago,
-        'numero_venta': numero_venta,
-        'total_ventas': total_ventas,
-        'total_ventas_count': total_ventas_count,
-        'es_admin': es_administrador(request.user),
+    es_admin = es_administrador(request.user)
+    formulario = FiltrosHistorialVentas(request.GET, es_admin=es_admin)
+    ventas = formulario.aplicar(ventas_visibles(request.user))
+    resumen = resumir_ventas(ventas)
+    resultados = ventas.order_by("-fecha", "-pk")
+    if es_admin:
+        resultados = resultados.select_related("usuario")
+    paginador = Paginator(resultados, 50)
+    # El agregado ya contó todos los registros, con los mismos filtros.
+    paginador.count = resumen.cantidad_vigente + resumen.cantidad_anulada
+    pagina = paginador.get_page(request.GET.get("page"))
+    contexto = {
+        "formulario": formulario,
+        "ventas": pagina,
+        "resumen": resumen,
+        "es_admin": es_admin,
+        "filtros_url": formulario.parametros(incluir_pagina=False),
     }
-    
-    return render(request, 'inventario/listar_ventas.html', context)
+    plantilla = (
+        "inventario/fragmentos/historial_ventas.html"
+        if request.headers.get("X-Historial-Parcial") == "1"
+        else "inventario/listar_ventas.html"
+    )
+    return render(request, plantilla, contexto)
 
-@permiso_requerido('inventario.view_venta')
+
+@never_cache
+@permiso_requerido("inventario.view_venta")
+@require_safe
 def detalle_venta(request, venta_id):
-    """Detalle de una venta - Usuarios normales solo ven sus propias ventas"""
-    venta = get_object_or_404(ventas_visibles(request.user), id=venta_id)
-    items = venta.items.select_related('producto').all()
-    
-    context = {
-        'venta': venta,
-        'items': items,
-        'es_admin': es_administrador(request.user),
-    }
-    
-    return render(request, 'inventario/detalle_venta.html', context)
+    venta = get_object_or_404(
+        ventas_visibles(request.user).select_related("usuario"), id=venta_id
+    )
+    formulario = FiltrosHistorialVentas(
+        request.GET, es_admin=es_administrador(request.user)
+    )
+    parametros = formulario.parametros().urlencode()
+    regreso = reverse("listar_ventas")
+    if parametros:
+        regreso += f"?{parametros}"
+    contexto = {"venta": venta, "items": venta.items.all(), "regreso": regreso}
+    return render(request, "inventario/detalle_venta.html", contexto)
 
-@permiso_requerido('inventario.change_venta')
+
+@permiso_requerido("inventario.change_venta")
 def cancelar_venta(request, venta_id):
     return operaciones_financieras_suspendidas()
 

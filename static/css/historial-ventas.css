@@ -1,0 +1,129 @@
+.main-container:has(.historial-ventas) {
+    max-width: 1280px;
+    padding: clamp(.75rem, 2vw, 1.5rem);
+    animation: none;
+}
+
+.historial-ventas {
+    --hist-fondo: #fff;
+    --hist-suave: #f4f7fc;
+    --hist-texto: #182742;
+    --hist-secundario: #45566f;
+    --hist-borde: #dbe3ec;
+    --hist-acento: #184c96;
+    --hist-acento-fondo: #edf4ff;
+    --hist-vigente: #165a3a;
+    --hist-vigente-fondo: #e8f5ed;
+    --hist-anulada: #8f2929;
+    --hist-anulada-fondo: #fdf0ee;
+    color: var(--hist-texto);
+    display: grid;
+    gap: .75rem;
+    min-width: 0;
+}
+
+body.dark-mode .historial-ventas {
+    --hist-fondo: #2d3542;
+    --hist-suave: #25303e;
+    --hist-texto: #edf3fa;
+    --hist-secundario: #cbd6e4;
+    --hist-borde: #526073;
+    --hist-acento: #b1d0ff;
+    --hist-acento-fondo: #283f60;
+    --hist-vigente: #a6ebc6;
+    --hist-vigente-fondo: #253f36;
+    --hist-anulada: #ffc1b8;
+    --hist-anulada-fondo: #523432;
+}
+
+.historial-ventas :focus-visible { outline: 2px solid var(--hist-acento); outline-offset: 2px; }
+.historial-ventas .btn:hover { transform: none; }
+.historial-ventas a:not(.btn), .historial-ventas .btn-outline-primary { color: var(--hist-acento); }
+.historial-ventas .btn-outline-primary { border-color: var(--hist-acento); background: var(--hist-acento-fondo); }
+.historial-ventas .btn-outline-secondary { color: var(--hist-texto); border-color: var(--hist-borde); }
+.historial-ventas .btn-outline-secondary:hover { background: var(--hist-suave); }
+.hist-contenido { display: grid; gap: .75rem; min-width: 0; }
+.hist-cabecera, .hist-herramientas, .hist-acciones, .hist-paginacion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .45rem .75rem;
+}
+.hist-cabecera { justify-content: space-between; }
+.hist-cabecera h1 { font-size: clamp(1.35rem, 2.9vw, 2rem); font-weight: 740; margin: 0; overflow-wrap: anywhere; }
+.historial-ventas h2 { font-size: 1rem; font-weight: 700; margin: 0; }
+.hist-panel {
+    background: var(--hist-fondo);
+    border: 1px solid var(--hist-borde);
+    padding: .75rem;
+    border-radius: 10px;
+    min-width: 0;
+}
+.hist-periodos { margin-bottom: .55rem; }
+.hist-periodos legend { font-size: .79rem; font-weight: 700; color: var(--hist-secundario); margin-bottom: .25rem; }
+.hist-periodo { display: inline-block; position: relative; margin: 0 .2rem .25rem 0; cursor: pointer; }
+.hist-periodo input { opacity: 0; position: absolute; width: 1px; height: 1px; }
+.hist-periodo span {
+    display: block;
+    padding: .25rem .6rem;
+    border: 1px solid var(--hist-borde);
+    border-radius: .45rem;
+    font-size: .83rem;
+    font-weight: 620;
+}
+.hist-periodo input:checked + span { background: var(--hist-acento-fondo); color: var(--hist-acento); border-color: var(--hist-acento); }
+.hist-periodo input:focus-visible + span { outline: 2px solid var(--hist-acento); outline-offset: 2px; }
+.hist-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(9.75rem, 100%), 1fr)); gap: .55rem; }
+.hist-campos label { font-size: .79rem; margin-bottom: .2rem; font-weight: 650; }
+.hist-campos :is(input, select) { min-width: 0; }
+.hist-fechas { grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 12rem)); margin-bottom: .6rem; }
+form:not(:has(input[value="personalizado"]:checked)) > .hist-fechas { display: none; }
+.hist-acciones { margin-top: .65rem; }
+.hist-error { padding: .5rem .75rem; border-radius: .45rem; color: var(--hist-anulada); background: var(--hist-anulada-fondo); }
+.hist-indicadores, .hist-pagos, .hist-datos-venta {
+    display: grid;
+    gap: .55rem;
+    margin: 0;
+}
+.hist-indicadores { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.hist-indicador-destacado { background: var(--hist-acento-fondo); }
+.historial-ventas dt { font-size: .79rem; color: var(--hist-secundario); font-weight: 650; }
+.historial-ventas dd { margin-bottom: 0; overflow-wrap: anywhere; }
+.hist-indicadores dd, .hist-total-detalle {
+    font-size: clamp(1rem, 2.25vw, 1.55rem);
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+}
+.hist-indicadores small, .hist-pagos small, .hist-stock { color: var(--hist-secundario); font-size: .76rem; }
+.hist-desglose { margin-top: .55rem; }
+.hist-pagos { grid-template-columns: repeat(auto-fit, minmax(min(8.5rem, 100%), 1fr)); margin-top: .5rem; }
+.hist-pagos dd { font-weight: 650; font-variant-numeric: tabular-nums; }
+.hist-tabla-contenedor { overflow: auto; margin-top: .55rem; }
+.hist-tabla { width: 100%; font-size: .85rem; }
+.hist-tabla th, .hist-tabla td { padding: .47rem .55rem; border-bottom: 1px solid var(--hist-borde); text-align: start; }
+.hist-tabla thead { background: var(--hist-suave); }
+.hist-tabla tbody th { overflow-wrap: anywhere; min-width: 8rem; }
+.hist-tabla tbody tr:last-child > * { border-bottom: 0; }
+.hist-tabla time, .hist-monto { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hist-monto { font-weight: 680; }
+.hist-estado { display: inline-block; padding: .17rem .42rem; border-radius: .35rem; font-size: .75rem; font-weight: 650; }
+.hist-vigente { color: var(--hist-vigente); background: var(--hist-vigente-fondo); }
+.hist-anulada { color: var(--hist-anulada); background: var(--hist-anulada-fondo); }
+.hist-paginacion { justify-content: center; margin-top: .65rem; font-size: .86rem; }
+.hist-vacio { color: var(--hist-secundario); margin: .6rem 0 0; }
+.hist-datos-venta { grid-template-columns: repeat(auto-fit, minmax(min(9.75rem, 100%), 1fr)); }
+.hist-stock { display: block; font-weight: normal; }
+.historial-ventas #accesibilidad-controls {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    animation: none;
+}
+
+@media (max-width: 650px) {
+    .hist-indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .hist-campos:not(.hist-fechas) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .hist-tabla th, .hist-tabla td { padding: .45rem; }
+    body:has(.historial-ventas) .navbar-nav { flex-wrap: wrap; flex-direction: row; }
+    body:has(.historial-ventas) .navbar-nav > .btn-lg { font-size: .9rem; padding: .4rem .65rem; }
+}

@@ -1,0 +1,117 @@
+{% load tz ventas_tags %}
+<div class="hist-contenido" data-historial-contenido>
+    <form method="get" action="{% url 'listar_ventas' %}" class="hist-panel" data-historial-filtros>
+        <fieldset class="hist-periodos">
+            <legend>Período</legend>
+            {% for opcion in formulario.periodo %}
+            <label class="hist-periodo">{{ opcion.tag }}<span>{{ opcion.choice_label }}</span></label>
+            {% endfor %}
+        </fieldset>
+        <div class="hist-campos hist-fechas">
+            {% for campo in formulario %}
+            {% if campo.name == 'fecha_desde' or campo.name == 'fecha_hasta' %}
+            <div>{{ campo.label_tag }}{{ campo }}</div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="hist-campos">
+            {% for campo in formulario %}
+            {% if campo.name != 'periodo' and campo.name != 'fecha_desde' and campo.name != 'fecha_hasta' %}
+            <div>{{ campo.label_tag }}{{ campo }}</div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% if formulario.errors %}
+        <div class="hist-error mt-2" role="alert">
+            <strong>Revisa los filtros.</strong>
+            <ul class="mb-0">
+                {% for mensaje in formulario.non_field_errors %}<li>{{ mensaje }}</li>{% endfor %}
+                {% for campo in formulario %}
+                {% for mensaje in campo.errors %}<li>{{ campo.label }} · {{ mensaje }}</li>{% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        <div class="hist-acciones">
+            <button class="btn btn-primary btn-sm" type="submit">Filtrar</button>
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'listar_ventas' %}" data-historial-enlace>Limpiar</a>
+        </div>
+    </form>
+
+    <section aria-label="Resumen financiero filtrado">
+        <dl class="hist-indicadores">
+            <div class="hist-panel hist-indicador-destacado">
+                <dt>Total vendido vigente</dt><dd data-total-vigente>{{ resumen.total_vigente|clp }}</dd>
+            </div>
+            <div class="hist-panel"><dt>Ventas vigentes</dt><dd>{{ resumen.cantidad_vigente }}</dd></div>
+            <div class="hist-panel"><dt>Promedio por venta</dt><dd>{{ resumen.promedio|clp:2 }}</dd></div>
+            <div class="hist-panel">
+                <dt>Monto original anulado</dt><dd>{{ resumen.monto_anulado|clp }}</dd>
+                <small>{{ resumen.cantidad_anulada }} venta{{ resumen.cantidad_anulada|pluralize }} anulada{{ resumen.cantidad_anulada|pluralize }}</small>
+            </div>
+        </dl>
+        <section class="hist-panel hist-desglose" aria-labelledby="hist-metodos">
+            <h2 id="hist-metodos">Ventas vigentes por método de pago</h2>
+            <dl class="hist-pagos">
+                {% for pago in resumen.pagos %}
+                <div>
+                    <dt>{{ pago.etiqueta }}{% if pago.metodo == 'efectivo' %} neto{% endif %}</dt>
+                    <dd>{{ pago.total|clp }} <small>· {{ pago.cantidad }} venta{{ pago.cantidad|pluralize }}</small></dd>
+                </div>
+                {% endfor %}
+            </dl>
+        </section>
+    </section>
+
+    <section class="hist-panel" aria-labelledby="hist-resultados">
+        <header class="hist-cabecera">
+            <h2 id="hist-resultados" tabindex="-1">Ventas del período</h2>
+            <a class="btn btn-outline-primary btn-sm" id="hist-actualizar"
+               href="{% querystring filtros_url page=ventas.number %}" data-historial-enlace>Actualizar</a>
+        </header>
+        {% if ventas %}
+        {% timezone "America/Santiago" %}
+        <div class="hist-tabla-contenedor" role="region" aria-label="Historial de ventas" tabindex="0">
+            <table class="hist-tabla" aria-label="Ventas del período">
+                <thead>
+                    <tr>
+                        <th scope="col">Número</th><th scope="col">Fecha y hora</th><th scope="col">Modalidad</th>
+                        <th scope="col">Método</th><th scope="col">Total</th>
+                        {% if es_admin %}<th scope="col">Vendedor</th>{% endif %}
+                        <th scope="col">Estado</th><th scope="col">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for venta in ventas %}
+                    <tr>
+                        <th scope="row">{{ venta.numero_venta }}</th>
+                        <td><time datetime="{{ venta.fecha|date:'c' }}">{{ venta.fecha|date:"d/m/Y H:i" }}</time></td>
+                        <td>{{ venta.get_modalidad_display|default_if_none:"Histórica sin clasificar" }}</td>
+                        <td>{{ venta.get_metodo_pago_display }}</td>
+                        <td class="hist-monto">{{ venta.total|clp }}</td>
+                        {% if es_admin %}<td>{{ venta.usuario.username|default:"—" }}</td>{% endif %}
+                        <td>{% include 'inventario/fragmentos/estado_venta.html' %}</td>
+                        <td><a href="{% url 'detalle_venta' venta.id %}{% querystring filtros_url page=ventas.number %}"
+                               aria-label="Ver venta {{ venta.numero_venta }}">Ver</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endtimezone %}
+        {% if ventas.has_other_pages %}
+        <nav class="hist-paginacion" aria-label="Paginación">
+            {% if ventas.has_previous %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% querystring filtros_url page=ventas.previous_page_number %}" data-historial-enlace>Anterior</a>
+            {% endif %}
+            <span aria-current="page">Página {{ ventas.number }} de {{ ventas.paginator.num_pages }}</span>
+            {% if ventas.has_next %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% querystring filtros_url page=ventas.next_page_number %}" data-historial-enlace>Siguiente</a>
+            {% endif %}
+        </nav>
+        {% endif %}
+        {% else %}
+        <p class="hist-vacio">No hay ventas que coincidan con los filtros.</p>
+        {% endif %}
+    </section>
+</div>

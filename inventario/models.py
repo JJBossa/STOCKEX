@@ -408,6 +408,9 @@ class Venta(models.Model):
         verbose_name_plural = "Ventas"
         ordering = ['-fecha']
         permissions = [("registrar_venta", "Puede registrar ventas de punto de venta")]
+        indexes = [
+            models.Index(fields=["-fecha", "-id"], name="venta_fecha_id_desc_idx")
+        ]
 
     def __str__(self):
         return f"Venta #{self.numero_venta} - ${self.total:,.0f} - {self.fecha.strftime('%d/%m/%Y %H:%M')}"

@@ -517,6 +517,7 @@ def test_migracion_avance_y_reversion_con_ventas(client, admin_user, producto):
     anterior = [("inventario", "0017_proteger_cuentas_por_cobrar")]
     nueva = [("inventario", "0018_nucleo_seguro_ventas")]
     migracion = MigrationExecutor(connection)
+    esquema_inicial = migracion.loader.graph.leaf_nodes()
     apps_anteriores = migracion.loader.project_state(anterior).apps
     VentaAnterior = apps_anteriores.get_model("inventario", "Venta")
     ItemAnterior = apps_anteriores.get_model("inventario", "ItemVenta")
@@ -561,4 +562,4 @@ def test_migracion_avance_y_reversion_con_ventas(client, admin_user, producto):
             venta_id=nueva_id
         ) == (0, 0)
     finally:
-        MigrationExecutor(connection).migrate(nueva)
+        MigrationExecutor(connection).migrate(esquema_inicial)
