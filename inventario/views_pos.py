@@ -3,29 +3,23 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.db.models import Sum
 from django.core.paginator import Paginator
-from .models import Producto, Cliente
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_safe
+from .models import Producto
+from .registro_ventas import PERMISO_REGISTRAR_VENTA
 from .utils import es_administrador
-from .access import operaciones_financieras_suspendidas, permiso_requerido, ventas_visibles
+from .access import (
+    operaciones_financieras_suspendidas,
+    permiso_requerido,
+    ventas_visibles,
+)
 
-@permiso_requerido('inventario.view_venta')
+
+@never_cache
+@permiso_requerido(PERMISO_REGISTRAR_VENTA)
+@require_safe
 def punto_venta(request):
-    """Vista de consulta del punto de venta durante la suspensión."""
-    
-    # Obtener productos activos para búsqueda
-    productos = Producto.objects.filter(activo=True).order_by('nombre')
-    
-    # Obtener clientes activos para selección
-    clientes = Cliente.objects.none()
-    if request.user.has_perm('inventario.view_cliente'):
-        clientes = Cliente.objects.filter(activo=True).order_by('nombre')
-    
-    context = {
-        'productos': productos,
-        'clientes': clientes,
-        'es_admin': es_administrador(request.user),
-    }
-    
-    return render(request, 'inventario/punto_venta.html', context)
+    return render(request, "inventario/punto_venta.html")
 
 @permiso_requerido('inventario.view_venta')
 def buscar_producto_pos(request):

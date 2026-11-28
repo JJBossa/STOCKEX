@@ -92,33 +92,6 @@ const PrimerUso = {
 function mostrarMensajesPrimerUso() {
     const path = window.location.pathname;
     
-    // Punto de Venta
-    if (path.includes('/pos/') || path.includes('punto_venta')) {
-        if (PrimerUso.esPrimeraVez('pos_basico')) {
-            setTimeout(() => {
-                PrimerUso.mostrarMensaje(
-                    'pos_basico',
-                    'Escanea códigos de barras o busca productos manualmente. El carrito se limpia automáticamente después de cada venta.',
-                    'top'
-                );
-            }, 1000);
-        }
-        
-        // Mensaje sobre favoritos en POS
-        if (PrimerUso.esPrimeraVez('pos_favoritos')) {
-            setTimeout(() => {
-                const favoritosBtn = document.querySelector('a[href*="mis-favoritos"]');
-                if (favoritosBtn) {
-                    PrimerUso.mostrarMensaje(
-                        'pos_favoritos',
-                        '¿Sabías que puedes marcar productos como favoritos? Así los tendrás a mano para ventas rápidas.',
-                        'bottom'
-                    );
-                }
-            }, 3000);
-        }
-    }
-    
     // Dashboard
     if (path.includes('/dashboard/') && !path.includes('usuario')) {
         if (PrimerUso.esPrimeraVez('dashboard_personalizar')) {

@@ -78,32 +78,19 @@ El dashboard muestra:
 
 ## Punto de Venta (POS)
 
-### Realizar una Venta
-1. Accede al Punto de Venta desde el menú
-2. Busca productos usando:
-   - Barra de búsqueda (nombre o SKU)
-   - Escaneo de código de barras (presiona `F`)
-   - Selección manual
-3. Agrega productos al carrito
-4. Selecciona el cliente (opcional)
-5. Aplica descuentos si es necesario:
-   - Descuento fijo ($)
-   - Descuento porcentual (%)
-6. Selecciona método de pago
-7. Ingresa el monto recibido
-8. Haz clic en "Procesar Venta"
+### Registrar una venta rápida
 
-### Atajos de Teclado
-- **F1**: Buscar producto
-- **F2**: Procesar venta
-- **F3**: Limpiar carrito
-- **F**: Búsqueda rápida por código de barras
-- **Ctrl+K**: Búsqueda global
+1. Abre el punto de venta e ingresa el monto entero en CLP.
+2. Elige efectivo, tarjeta o transferencia. Para efectivo, indica el monto recibido si necesitas calcular el vuelto.
+3. Pulsa **Registrar venta**. La última venta confirmada queda visible mientras preparas la siguiente.
 
-### Venta a Crédito
-1. Selecciona un cliente
-2. Marca la casilla "Venta a Crédito"
-3. Se creará automáticamente una cuenta por cobrar
+### Registrar una venta detallada
+
+1. Elige **Venta detallada** y busca por nombre, SKU o categoría. Enfoca el buscador antes de usar un lector de códigos.
+2. Selecciona un resultado con el mouse o las flechas y **Enter**. Repite la selección para sumar una unidad, o edita la cantidad en la línea.
+3. Elige el medio de pago y registra la operación. Si cambiaron los precios, revisa el nuevo total y acéptalo antes de registrar.
+
+Usa **Ctrl+Enter** para registrar cuando el foco esté en el formulario, fuera del buscador. Si la respuesta queda pendiente, reintenta desde la misma pestaña y cuenta. Consulta el [flujo de recuperación](docs/funcionalidades/STK_04B_INTERFAZ_PUNTO_VENTA.md).
 
 ---
 
@@ -121,7 +108,6 @@ El dashboard muestra:
 - Información completa de la venta
 - Lista de productos vendidos
 - Opción de imprimir ticket
-- Opción de cancelar venta (solo si no está cancelada)
 
 ### Imprimir Ticket
 1. En el detalle de venta, haz clic en "Imprimir"
@@ -283,7 +269,7 @@ El dashboard muestra:
 ## Consejos y Trucos
 
 1. **Búsqueda Rápida**: Usa `Ctrl+K` para buscar en todo el sistema
-2. **Atajos de Teclado**: En el POS, usa F1, F2, F3 para acciones rápidas
+2. **Atajos de teclado**. En el POS, usa Ctrl+Enter para registrar y las flechas y Enter para seleccionar productos.
 3. **Favoritos**: Marca productos frecuentes como favoritos para acceso rápido
 4. **Exportación**: Exporta datos regularmente para respaldos
 5. **Notificaciones**: Revisa regularmente las notificaciones para estar al día
