@@ -1,4 +1,5 @@
 from django.urls import path
+from .views_catalogo import catalogo_productos
 from .views_importacion_productos import importar_productos_excel
 from . import views
 from . import views_extra
@@ -28,6 +29,7 @@ from . import views_idioma
 from . import views_reportes_programados
 
 urlpatterns = [
+    path("api/catalogo-productos/", catalogo_productos, name="catalogo_productos"),
     path(
         "productos/importar-excel/",
         importar_productos_excel,

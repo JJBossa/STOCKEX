@@ -12,6 +12,10 @@
     </ol>
 </nav>
 
+{% if perms.inventario.view_producto %}
+    {% include 'inventario/buscador_productos.html' %}
+{% endif %}
+
 {% if es_admin %}
 <div class="alert alert-info border-0 mb-4" role="alert" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border: 1px solid #93c5fd !important;">
     <div class="d-flex justify-content-between align-items-center flex-wrap">
@@ -622,4 +626,9 @@ document.getElementById('categoria-filter').addEventListener('change', function(
 
 {% block ayuda %}
 {% include 'inventario/ayuda_contextual.html' %}
+{% endblock %}
+{% block extra_js %}
+{% if perms.inventario.view_producto %}
+<script type="module" src="{% static 'js/buscador-productos.js' %}"></script>
+{% endif %}
 {% endblock %}

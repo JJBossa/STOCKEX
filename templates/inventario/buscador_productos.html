@@ -1,0 +1,16 @@
+<section class="card mb-3" data-buscador-productos
+         data-catalogo="{% url 'catalogo_productos' %}"
+         data-detalle="{% url 'detalle_producto' 0 %}">
+    <div class="card-body">
+        <label class="form-label fw-semibold" for="catalogo-consulta">Búsqueda rápida de productos</label>
+        <input id="catalogo-consulta" class="form-control" type="search" role="combobox"
+               autocomplete="off" aria-autocomplete="list" aria-expanded="false"
+               aria-controls="catalogo-resultados" aria-describedby="catalogo-estado"
+               placeholder="Nombre, SKU o categoría" data-consulta>
+        <p id="catalogo-estado" class="small text-body-secondary my-2" role="status" data-estado></p>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-reintentar hidden>Reintentar</button>
+        <ul id="catalogo-resultados" role="listbox" aria-label="Productos encontrados"
+            class="list-group" data-resultados hidden></ul>
+        <a class="btn btn-sm btn-outline-primary" data-seleccion hidden></a>
+    </div>
+</section>
