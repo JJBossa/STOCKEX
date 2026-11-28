@@ -407,7 +407,10 @@ class Venta(models.Model):
         verbose_name = "Venta"
         verbose_name_plural = "Ventas"
         ordering = ['-fecha']
-        permissions = [("registrar_venta", "Puede registrar ventas de punto de venta")]
+        permissions = (
+            ("registrar_venta", "Puede registrar ventas de punto de venta"),
+            ("anular_venta", "Puede anular ventas de punto de venta"),
+        )
         indexes = [
             models.Index(fields=["-fecha", "-id"], name="venta_fecha_id_desc_idx")
         ]
@@ -419,6 +422,7 @@ class Venta(models.Model):
         if not self.numero_venta:
             self.numero_venta = f"V-{uuid.uuid4().hex}"
         super().save(*args, **kwargs)
+
 
 class ItemVenta(models.Model):
     """Items de una venta"""
@@ -1622,3 +1626,21 @@ class WidgetDashboard(models.Model):
     
     def __str__(self):
         return f"{self.usuario.username} - {self.get_tipo_display()}"
+
+
+class AnulacionVenta(models.Model):
+    """Auditoría de una anulación nueva. Las ventas históricas pueden carecer de ella."""
+
+    venta = models.OneToOneField(
+        Venta, on_delete=models.PROTECT, related_name="anulacion"
+    )
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    fecha = models.DateTimeField(auto_now_add=True)
+    motivo = models.CharField(max_length=250)
+
+    class Meta:
+        constraints = (
+            models.CheckConstraint(
+                condition=~models.Q(motivo=""), name="anulacion_venta_motivo_no_vacio"
+            ),
+        )

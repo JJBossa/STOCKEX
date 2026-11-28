@@ -1,11 +1,20 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_safe
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_POST, require_safe
 from django.views.decorators.vary import vary_on_headers
+from .anulacion_ventas import (
+    MAX_MOTIVO,
+    PERMISO_ANULAR_VENTA,
+    ErrorAnulacion,
+    anular_venta,
+    impedimento_anulacion,
+    tiene_permiso_anulacion,
+)
 from .historial_ventas import FiltrosHistorialVentas, resumir_ventas
 from .models import Producto
 from .registro_ventas import PERMISO_REGISTRAR_VENTA
@@ -71,9 +80,10 @@ def buscar_producto_pos(request):
             'mensaje': f'Producto con código {codigo} no encontrado'
         })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
-@permiso_requerido('inventario.view_venta')
+
+@permiso_requerido("inventario.view_venta")
 def procesar_venta(request):
     return operaciones_financieras_suspendidas()
 
@@ -113,23 +123,78 @@ def listar_ventas(request):
 @permiso_requerido("inventario.view_venta")
 @require_safe
 def detalle_venta(request, venta_id):
-    venta = get_object_or_404(
-        ventas_visibles(request.user).select_related("usuario"), id=venta_id
-    )
-    formulario = FiltrosHistorialVentas(
+    return mostrar_detalle_venta(request, venta_id)
+
+
+def parametros_historial(request):
+    filtros = FiltrosHistorialVentas(
         request.GET, es_admin=es_administrador(request.user)
     )
-    parametros = formulario.parametros().urlencode()
-    regreso = reverse("listar_ventas")
-    if parametros:
-        regreso += f"?{parametros}"
-    contexto = {"venta": venta, "items": venta.items.all(), "regreso": regreso}
-    return render(request, "inventario/detalle_venta.html", contexto)
+    return filtros.parametros().urlencode()
 
 
-@permiso_requerido("inventario.change_venta")
+def url_historial(parametros, nombre, *args):
+    url = reverse(nombre, args=args)
+    return f"{url}?{parametros}" if parametros else url
+
+
+def mostrar_detalle_venta(request, venta_id, *, error=None, motivo="", estado=200):
+    venta = get_object_or_404(
+        ventas_visibles(request.user).select_related("usuario", "anulacion__usuario"),
+        id=venta_id,
+    )
+    autorizada = not venta.cancelada and tiene_permiso_anulacion(request.user)
+    impedimento = impedimento_anulacion(venta) if autorizada else None
+    parametros = parametros_historial(request)
+    contexto = {
+        "venta": venta,
+        "items": venta.items.all(),
+        "regreso": url_historial(parametros, "listar_ventas"),
+        "anulacion": getattr(venta, "anulacion", None),
+        "puede_anular": autorizada and not impedimento,
+        "impedimento": impedimento,
+        "url_anular": url_historial(parametros, "cancelar_venta", venta_id),
+        "url_detalle": url_historial(parametros, "detalle_venta", venta_id),
+        "error_anulacion": error,
+        "motivo": motivo,
+        "max_motivo": MAX_MOTIVO,
+    }
+    return render(request, "inventario/detalle_venta.html", contexto, status=estado)
+
+
+@never_cache
+@csrf_protect
+@permiso_requerido(PERMISO_ANULAR_VENTA)
+@require_POST
 def cancelar_venta(request, venta_id):
-    return operaciones_financieras_suspendidas()
+    solicita_json = request.headers.get("Accept") == "application/json"
+    motivo = request.POST.get("motivo", "")
+    try:
+        resultado = anular_venta(request.user, venta_id, motivo)
+    except ErrorAnulacion as error:
+        if solicita_json:
+            respuesta = JsonResponse(
+                {"error": error.codigo, "mensaje": str(error)}, status=error.estado
+            )
+        else:
+            respuesta = mostrar_detalle_venta(
+                request,
+                venta_id,
+                error=str(error),
+                motivo=motivo[:MAX_MOTIVO],
+                estado=error.estado,
+            )
+        if error.estado == 503:
+            respuesta["Retry-After"] = "1"
+        return respuesta
+    if solicita_json:
+        return JsonResponse(
+            {"id": venta_id, "cancelada": True, "repetida": resultado.repetida},
+            status=200 if resultado.repetida else 201,
+        )
+    return redirect(
+        url_historial(parametros_historial(request), "detalle_venta", venta_id)
+    )
 
 
 @login_required

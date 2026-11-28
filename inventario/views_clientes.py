@@ -37,12 +37,14 @@ def listar_clientes(request):
         clientes = clientes.filter(activo=False)
     
     # Ordenamiento
-    orden = request.GET.get('orden', 'nombre')
-    if orden == 'nombre':
-        clientes = clientes.order_by('nombre')
-    elif orden == 'total_compras':
-        clientes = clientes.annotate(total=Sum('ventas__total')).order_by('-total')
-    elif orden == 'saldo_pendiente':
+    orden = request.GET.get("orden", "nombre")
+    if orden == "nombre":
+        clientes = clientes.order_by("nombre")
+    elif orden == "total_compras":
+        clientes = clientes.annotate(
+            total=Sum("ventas__total", filter=Q(ventas__cancelada=False), default=0)
+        ).order_by("-total", "nombre", "pk")
+    elif orden == "saldo_pendiente":
         # Ordenar por saldo pendiente (más complejo, se hace después)
         pass
     

@@ -5,7 +5,7 @@
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/historial-ventas.css' %}">{% endblock %}
 
 {% block content %}
-<section class="historial-ventas">
+<section class="historial-ventas" data-estado-venta="{% if venta.cancelada %}anulada{% else %}vigente{% endif %}">
     <header class="hist-cabecera">
         <h1>Venta {{ venta.numero_venta }}</h1>
         <div class="hist-herramientas" data-controles-accesibilidad>
@@ -25,6 +25,48 @@
         <div><dt>Vuelto</dt><dd>{{ venta.cambio|clp }}</dd></div>
         {% endif %}
     </dl>
+    {% if venta.cancelada %}
+    <section class="hist-panel" aria-labelledby="anulacion-titulo">
+        <h2 id="anulacion-titulo">Anulación</h2>
+        {% if anulacion %}
+        <dl class="hist-datos-venta mb-0">
+            <div><dt>Responsable</dt><dd>{{ anulacion.usuario.get_username }}</dd></div>
+            <div><dt>Fecha y hora · Chile</dt><dd><time datetime="{{ anulacion.fecha|date:'c' }}">{{ anulacion.fecha|date:"d/m/Y H:i:s" }}</time></dd></div>
+            <div><dt>Motivo</dt><dd class="text-break" data-motivo-anulacion>{{ anulacion.motivo }}</dd></div>
+        </dl>
+        {% else %}
+        <p class="mb-0">Anulación histórica sin información de anulación disponible.</p>
+        {% endif %}
+    </section>
+    {% endif %}
+    {% if error_anulacion and not puede_anular %}
+    <p class="alert alert-warning" role="alert">{{ error_anulacion }}</p>
+    {% endif %}
+    {% if puede_anular %}
+    <details class="hist-panel" {% if error_anulacion %}open{% endif %}>
+        <summary class="fw-semibold text-decoration-underline">Anular venta</summary>
+        <form method="post" action="{{ url_anular }}" class="mt-3" data-form-anulacion data-venta="{{ venta.pk }}">
+            {% csrf_token %}
+            <p class="fw-semibold">La anulación es irreversible. Este ajuste interno no devuelve dinero.</p>
+            <dl class="hist-datos-venta">
+                <div><dt>Número</dt><dd>{{ venta.numero_venta }}</dd></div>
+                <div><dt>Fecha y hora original · Chile</dt><dd>{{ venta.fecha|date:"d/m/Y H:i" }}</dd></div>
+                <div><dt>Importe original</dt><dd>{{ venta.total|clp }}</dd></div>
+                <div><dt>Método de pago</dt><dd>{{ venta.get_metodo_pago_display }}</dd></div>
+            </dl>
+            <label for="motivo-anulacion" class="form-label">Motivo de la anulación</label>
+            <textarea id="motivo-anulacion" name="motivo" class="form-control mb-3" rows="3"
+                      required maxlength="{{ max_motivo }}">{{ motivo }}</textarea>
+            <p role="status" class="mb-2" data-estado-anulacion>{{ error_anulacion|default_if_none:"" }}</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-danger">Confirmar anulación</button>
+                <a href="{{ url_detalle }}" class="btn btn-outline-secondary" data-revisar-anulacion hidden>Comprobar estado</a>
+            </div>
+        </form>
+    </details>
+    {% elif impedimento and not error_anulacion %}
+    <p class="hist-panel">Anulación no disponible. {{ impedimento }}</p>
+    {% endif %}
     {% endtimezone %}
     {% if venta.notas %}
     <section class="hist-panel"><h2>Notas</h2><p class="mb-0">{{ venta.notas }}</p></section>
@@ -67,4 +109,10 @@
     </div>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block extra_js %}
+{% if puede_anular %}
+<script src="{% static 'js/anulacion-venta.js' %}" defer></script>
+{% endif %}
 {% endblock %}

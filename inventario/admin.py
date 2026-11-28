@@ -238,6 +238,7 @@ class CotizacionAdmin(admin.ModelAdmin):
     list_filter = ('estado', 'fecha_creacion', 'fecha_vencimiento')
     search_fields = ('numero_cotizacion', 'cliente_nombre', 'cliente_email')
     readonly_fields = ('numero_cotizacion', 'fecha_creacion', 'subtotal', 'total')
+    readonly_fields += ("convertida_en_venta",)
     inlines = [ItemCotizacionInline]
     ordering = ('-fecha_creacion',)
     date_hierarchy = 'fecha_creacion'

@@ -289,8 +289,10 @@ def imprimir_ticket_venta(request, venta_id):
 @permiso_requerido('inventario.view_venta')
 def imprimir_ticket_venta_termica(request, venta_id):
     """Genera ticket de venta para impresión térmica 58mm"""
-    venta = get_object_or_404(ventas_visibles(request.user), id=venta_id)
-    
+    venta = get_object_or_404(
+        ventas_visibles(request.user), id=venta_id, cancelada=False
+    )
+
     items = venta.items.all()
     
     buffer = io.BytesIO()
@@ -434,8 +436,10 @@ def imprimir_ticket_venta_termica(request, venta_id):
 @permiso_requerido('inventario.view_venta')
 def imprimir_ticket_venta_a4(request, venta_id):
     """Genera ticket de venta en formato A4 con formato similar a cotizaciones"""
-    venta = get_object_or_404(ventas_visibles(request.user), id=venta_id)
-    
+    venta = get_object_or_404(
+        ventas_visibles(request.user), id=venta_id, cancelada=False
+    )
+
     items = venta.items.all()
     
     buffer = io.BytesIO()

@@ -20,6 +20,7 @@ ADMINISTRADOR = {
         'add_transferencia',
     },
 }
+ADMINISTRADOR["inventario"].add("anular_venta")
 
 
 class Command(BaseCommand):
