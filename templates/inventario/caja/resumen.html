@@ -1,0 +1,42 @@
+{% load ventas_tags %}
+<div class="row g-3 mb-3">
+    <div class="col-sm-6">
+        <div class="card h-100"><div class="card-body">
+            <h3 class="h6">Total vendido</h3>
+            <div class="fs-3 fw-bold text-break">{{ resumen.total_vigente|clp }}</div>
+            <div>{{ resumen.cantidad_vigente }} venta{{ resumen.cantidad_vigente|pluralize }} vigente{{ resumen.cantidad_vigente|pluralize }}</div>
+        </div></div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card h-100 border-primary"><div class="card-body">
+            <h3 class="h6">Efectivo esperado</h3>
+            <div class="fs-3 fw-bold text-break">{{ resumen.efectivo_esperado|clp }}</div>
+            <div>Saldo teórico de caja</div>
+        </div></div>
+    </div>
+</div>
+<div class="row g-3">
+    <div class="col-lg-6">
+        <h3 class="h6">Ventas por método de pago</h3>
+        <table class="table table-sm align-middle">
+            <thead><tr><th scope="col">Método</th><th scope="col" class="text-end">Ventas</th><th scope="col" class="text-end">Importe</th></tr></thead>
+            <tbody>
+                {% for nombre, pago in pagos %}
+                <tr><th scope="row">{{ nombre }}</th><td class="text-end">{{ pago.cantidad }}</td><td class="text-end">{{ pago.importe|clp }}</td></tr>
+                {% endfor %}
+                <tr><th scope="row">Anuladas</th><td class="text-end">{{ resumen.cantidad_anulada }}</td><td class="text-end">{{ resumen.monto_anulado|clp }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="col-lg-6">
+        <h3 class="h6">Composición del efectivo</h3>
+        <table class="table table-sm align-middle">
+            <tbody>
+                <tr><th scope="row">Efectivo inicial</th><td class="text-end">{{ resumen.efectivo_inicial|clp }}</td></tr>
+                <tr><th scope="row">Ventas en efectivo</th><td class="text-end">{{ resumen.por_metodo.efectivo.importe|clp }}</td></tr>
+                <tr><th scope="row">Ingresos adicionales ({{ resumen.cantidad_ingresos }})</th><td class="text-end">{{ resumen.ingresos|clp }}</td></tr>
+                <tr><th scope="row">Retiros ({{ resumen.cantidad_retiros }})</th><td class="text-end">{{ resumen.retiros|clp }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>

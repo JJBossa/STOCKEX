@@ -34,8 +34,20 @@
                     <i class="bi bi-cash-register"></i> {% if t %}{{ t.Ventas }}{% else %}Ventas{% endif %}
                 </a>
                 {% endif %}
+                {% if perms.inventario.consultar_caja or perms.inventario.abrir_caja %}
+                <a class="btn btn-outline-light btn-sm me-2" href="{% url 'caja_gestion' %}">Caja</a>
+                {% elif perms.inventario.consultar_cierres_caja %}
+                <a class="btn btn-outline-light btn-sm me-2" href="{% url 'caja_historial' %}">Caja</a>
+                {% endif %}
                 {% else %}
                 <!-- Menú Principal para Admin -->
+                <noscript>
+                    {% if perms.inventario.consultar_caja or perms.inventario.abrir_caja %}
+                    <a class="btn btn-outline-light btn-sm me-2" href="{% url 'caja_gestion' %}">Caja</a>
+                    {% elif perms.inventario.consultar_cierres_caja %}
+                    <a class="btn btn-outline-light btn-sm me-2" href="{% url 'caja_historial' %}">Caja</a>
+                    {% endif %}
+                </noscript>
                 <div class="dropdown me-2">
                     <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-grid-3x3-gap"></i> {% if t %}{{ t.Menú }}{% else %}Menú{% endif %}
@@ -46,6 +58,11 @@
                         <li><a class="dropdown-item" href="{% url 'punto_venta' %}"><i class="bi bi-cash-register text-success"></i> Punto de Venta</a></li>
                         {% endif %}
                         <li><a class="dropdown-item" href="{% url 'listar_ventas' %}"><i class="bi bi-clock-history text-primary"></i> Historial</a></li>
+                        {% if perms.inventario.consultar_caja or perms.inventario.abrir_caja %}
+                        <li><a class="dropdown-item" href="{% url 'caja_gestion' %}"><i class="bi bi-cash-stack text-success" aria-hidden="true"></i> Caja</a></li>
+                        {% elif perms.inventario.consultar_cierres_caja %}
+                        <li><a class="dropdown-item" href="{% url 'caja_historial' %}"><i class="bi bi-cash-stack text-success" aria-hidden="true"></i> Caja</a></li>
+                        {% endif %}
                         <li><a class="dropdown-item" href="{% url 'listar_cotizaciones' %}"><i class="bi bi-file-earmark-text text-info"></i> Cotizaciones</a></li>
                         <li><a class="dropdown-item" href="{% url 'listar_cuentas_cobrar' %}"><i class="bi bi-credit-card text-danger"></i> Cuentas por Cobrar</a></li>
                         <li><hr class="dropdown-divider"></li>

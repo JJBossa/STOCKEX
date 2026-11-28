@@ -1,0 +1,23 @@
+{% load tz %}
+<section data-estado-caja aria-labelledby="caja-titulo-estado">
+    {{ estado|json_script:"caja-datos-estado" }}
+    {% if abierta %}
+        <h2 id="caja-titulo-estado" class="h4">Caja abierta{% if sesion %} · Sesión #{{ sesion.pk }}{% endif %}</h2>
+        {% if sesion %}
+            {% timezone "America/Santiago" %}
+            <p>Abierta por <strong>{{ sesion.abierta_por.get_username }}</strong> el
+                <time datetime="{{ sesion.abierta_en|date:'c' }}">{{ sesion.abierta_en|date:"d/m/Y H:i" }}</time>.
+            </p>
+            {% endtimezone %}
+            {% if sesion.observaciones_apertura %}<p class="text-break">{{ sesion.observaciones_apertura }}</p>{% endif %}
+            {% include "inventario/caja/resumen.html" %}
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'caja_listado_movimientos' sesion.pk %}">Ver movimientos</a>
+        {% endif %}
+        {% if perms.inventario.registrar_venta %}
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'punto_venta' %}">Ir al punto de venta</a>
+        {% endif %}
+    {% else %}
+        <h2 id="caja-titulo-estado" class="h4">Caja cerrada</h2>
+        <p>Se requiere una apertura para registrar nuevas ventas.</p>
+    {% endif %}
+</section>

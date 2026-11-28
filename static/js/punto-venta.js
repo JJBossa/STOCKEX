@@ -1,3 +1,5 @@
+import {uuidV4} from "./solicitud-financiera.js";
+
 const moneda = new Intl.NumberFormat("es-CL", {style: "currency", currency: "CLP"});
 const enteroCL = new Intl.NumberFormat("es-CL");
 const fechaCL = new Intl.DateTimeFormat("es-CL", {
@@ -33,16 +35,6 @@ function montoCL(texto) {
 function subtotalLinea(linea, precio = linea.precio) {
     const subtotal = linea.cantidad * precio;
     return enteroPositivo(subtotal, MAX_SUBTOTAL) ? subtotal : null;
-}
-
-function uuidV4() {
-    if (crypto.randomUUID) return crypto.randomUUID();
-    // getRandomValues también funciona en las instalaciones locales por HTTP.
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-    return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
 }
 
 function datosRecuperables(datos) {
@@ -84,6 +76,7 @@ function montarPuntoVenta(raiz) {
     let buscador, cargaBuscador;
     let pendiente = null, claveEdicion = null, preciosNuevos = null;
     let enviando = false, revisarClave = false;
+    let cajaAbierta = raiz.dataset.cajaAbierta === "true";
 
     const modalidad = () => formulario.elements.modalidad.value;
     const metodo = () => formulario.elements.metodo.value;
@@ -124,11 +117,35 @@ function montarPuntoVenta(raiz) {
     function mostrarEstado() {
         edicion.disabled = pago.disabled = bloqueado();
         bloqueBusqueda.inert = bloqueado();
-        registrar.disabled = enviando || revisarClave || Boolean(preciosNuevos);
+        registrar.disabled = enviando || revisarClave || Boolean(preciosNuevos) || (!cajaAbierta && !pendiente);
         registrar.textContent = enviando ? "Registrando…" : pendiente ? "Reintentar registro" : "Registrar venta";
-        elemento("atajo").hidden = enviando || bloqueado();
+        elemento("atajo").hidden = enviando || bloqueado() || !cajaAbierta;
         formulario.setAttribute("aria-busy", String(enviando));
+        elemento("estado-caja").textContent = cajaAbierta ? "Caja abierta" : "Caja cerrada";
+        elemento("caja-cerrada").hidden = cajaAbierta;
     }
+
+    const actualizarCaja = elemento("actualizar-caja");
+    actualizarCaja.hidden = false;
+    actualizarCaja.addEventListener("click", async () => {
+        actualizarCaja.disabled = true;
+        try {
+            const respuesta = await fetch(raiz.dataset.estadoCaja, {
+                credentials: "same-origin", redirect: "error", signal: AbortSignal.timeout(12_000),
+                headers: {"X-Stockex-Account": usuario},
+            });
+            if (!respuesta.ok) throw new Error("Consulta rechazada");
+            const datos = await respuesta.json();
+            if (typeof datos.abierta !== "boolean") throw new Error("Estado desconocido");
+            cajaAbierta = datos.abierta;
+            avisar();
+            mostrarEstado();
+        } catch {
+            avisar("No se pudo consultar el estado de caja. Comprueba tu conexión o vuelve a abrir el POS.", error);
+        } finally {
+            actualizarCaja.disabled = false;
+        }
+    });
 
     function enfocarEntrada() {
         (modalidad() === "rapida" ? monto : consulta).focus();
@@ -366,6 +383,13 @@ function montarPuntoVenta(raiz) {
         }
 
         const conservarClave = pendiente.clave;
+        if (status === 409 && datos.error === "caja_no_abierta") {
+            retirarPendiente();
+            claveEdicion = conservarClave;
+            cajaAbierta = false;
+            avisar("La caja está cerrada. La venta no se registró y sus datos se conservan.");
+            return error;
+        }
         if (status === 409 && datos.error === "precio_cambiado"
             && Array.isArray(datos.productos) && datos.productos.length
             && datos.productos.every(p => lineas.has(p?.producto_id) && enteroPositivo(p.precio_vigente, MAX_SUBTOTAL))) {
@@ -401,7 +425,7 @@ function montarPuntoVenta(raiz) {
 
     formulario.addEventListener("submit", async evento => {
         evento.preventDefault();
-        if (enviando || revisarClave || preciosNuevos) return;
+        if (enviando || revisarClave || preciosNuevos || (!cajaAbierta && !pendiente)) return;
         estado.textContent = "";
         elemento("sesion").hidden = true;
         avisar();
@@ -426,6 +450,7 @@ function montarPuntoVenta(raiz) {
                     "Content-Type": "application/json",
                     "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content,
                     "Idempotency-Key": pendiente.clave,
+                    "X-Stockex-Account": usuario,
                 },
                 body: pendiente.cuerpo,
                 signal: control.signal,

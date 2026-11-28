@@ -9,9 +9,15 @@ from django.db import OperationalError, connection, connections, transaction
 from django.test import Client
 from django.urls import reverse
 
-from inventario import anulacion_ventas, caja
+from inventario import anulacion_ventas, caja, registro_ventas
 from inventario.bloqueo_caja import bloquear_caja, sqlite_ocupado
-from inventario.models import BloqueoCaja, MovimientoCaja, SesionCaja, Venta
+from inventario.models import (
+    BloqueoCaja,
+    MovimientoCaja,
+    RegistroVenta,
+    SesionCaja,
+    Venta,
+)
 
 from .test_caja import abrir, datos_cierre, movimiento, rapida
 
@@ -57,8 +63,12 @@ def competir(primera, segunda):
                     return resultado
             with connection.execute_wrapper(vigilar_bloqueo):
                 return operacion()
-        except (caja.ErrorCaja, anulacion_ventas.ErrorAnulacion) as error:
-            if isinstance(error, caja.ErrorCaja):
+        except (
+            caja.ErrorCaja,
+            anulacion_ventas.ErrorAnulacion,
+            registro_ventas.ErrorRegistroVenta,
+        ) as error:
+            if isinstance(error, (caja.ErrorCaja, registro_ventas.ErrorRegistroVenta)):
                 return error.datos["error"]
             return error.codigo
         except OperationalError as error:
@@ -105,9 +115,18 @@ def test_apertura_y_venta_simultaneas(admin_user, abre_primero):
 
     if abre_primero:
         sesion, registrada = competir(apertura, venta)
+        assert registrada.sesion_caja_id == sesion.pk
     else:
-        registrada, sesion = competir(venta, apertura)
-    assert registrada.sesion_caja_id == (sesion.pk if abre_primero else None)
+
+        def venta_sin_caja():
+            bloquear_caja()
+            with pytest.raises(registro_ventas.ErrorRegistroVenta) as error:
+                venta()
+            return error.value.datos["error"]
+
+        rechazo, sesion = competir(venta_sin_caja, apertura)
+        assert rechazo == "caja_no_abierta"
+        assert not Venta.objects.exists() and not RegistroVenta.objects.exists()
 
 
 @pytest.mark.parametrize("misma_clave", [True, False])
@@ -166,8 +185,8 @@ def test_cierre_simultaneo_con_operacion(admin_user, operacion, cierra_primero):
             900 if previa else 0
         )
         if operacion == "venta":
-            # STK-06A permite una venta nueva sin sesión si el cierre confirma primero.
-            assert resultado.sesion_caja_id is None
+            assert resultado == "caja_no_abierta"
+            assert not Venta.objects.exists() and not RegistroVenta.objects.exists()
         elif operacion == "anulacion":
             assert resultado == "no_anulable"
             assert not Venta.objects.get(pk=previa.pk).cancelada

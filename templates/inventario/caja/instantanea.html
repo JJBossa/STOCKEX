@@ -1,0 +1,27 @@
+{% load tz ventas_tags %}
+<div data-instantanea-caja>
+    <section aria-labelledby="caja-titulo-conciliacion" class="card mb-3">
+        <div class="card-body">
+            <h2 id="caja-titulo-conciliacion" class="h5">Conciliación confirmada</h2>
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Clasificación</dt><dd class="col-sm-8">{{ clasificacion }}</dd>
+                <dt class="col-sm-4">Efectivo contado</dt><dd class="col-sm-8">{{ sesion.efectivo_contado|clp }}</dd>
+                <dt class="col-sm-4">Diferencia</dt><dd class="col-sm-8">{{ resumen.diferencia|clp }}</dd>
+                {% timezone "America/Santiago" %}
+                <dt class="col-sm-4">Apertura</dt>
+                <dd class="col-sm-8"><time datetime="{{ sesion.abierta_en|date:'c' }}">{{ sesion.abierta_en|date:"d/m/Y H:i" }}</time> · {{ sesion.abierta_por.get_username }}</dd>
+                <dt class="col-sm-4">Cierre</dt>
+                <dd class="col-sm-8"><time datetime="{{ sesion.cerrada_en|date:'c' }}">{{ sesion.cerrada_en|date:"d/m/Y H:i" }}</time> · {{ sesion.cerrada_por.get_username }}</dd>
+                {% endtimezone %}
+                <dt class="col-sm-4">Observaciones de apertura</dt>
+                <dd class="col-sm-8 text-break">{{ sesion.observaciones_apertura|default:"—"|linebreaksbr }}</dd>
+                <dt class="col-sm-4">Observaciones de cierre</dt>
+                <dd class="col-sm-8 text-break">{{ sesion.observaciones_cierre|default:"—"|linebreaksbr }}</dd>
+            </dl>
+        </div>
+    </section>
+    <section aria-labelledby="caja-titulo-instantanea">
+        <h2 id="caja-titulo-instantanea" class="h5">Resumen de jornada</h2>
+        {% include "inventario/caja/resumen.html" %}
+    </section>
+</div>

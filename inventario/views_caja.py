@@ -1,6 +1,7 @@
 from functools import wraps
 
 from django.http import JsonResponse
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
@@ -9,7 +10,33 @@ from django.views.decorators.http import require_GET, require_POST
 from . import caja
 from .access import permiso_requerido
 from .historial_ventas import SANTIAGO
-from .peticion_financiera import ErrorJSON, leer_json
+from .models import Venta
+from .peticion_financiera import ErrorJSON, comprobar_cuenta, leer_json
+
+CLASIFICACIONES = {
+    "cuadrada": "Caja cuadrada",
+    "faltante": "Faltante",
+    "sobrante": "Sobrante",
+}
+METODOS = dict(Venta.METODO_PAGO_CHOICES)
+
+
+def pagos_resumen(resumen):
+    return [
+        (METODOS[metodo], pago)
+        for metodo, pago in resumen["por_metodo"].items()
+        if metodo not in {"credito", "mixto"} or pago["cantidad"]
+    ]
+
+
+def contexto_cierre(sesion):
+    resumen = sesion.resumen_cierre
+    return {
+        "sesion": sesion,
+        "resumen": resumen,
+        "pagos": pagos_resumen(resumen),
+        "clasificacion": CLASIFICACIONES[resumen["clasificacion"]],
+    }
 
 
 def endpoint_caja(permiso, *, escritura=False):
@@ -24,6 +51,7 @@ def endpoint_caja(permiso, *, escritura=False):
         def responder(request, *args, **kwargs):
             try:
                 if escritura:
+                    comprobar_cuenta(request)
                     kwargs.update(
                         clave=request.headers.get("Idempotency-Key"),
                         datos=leer_json(request),
@@ -60,6 +88,27 @@ def datos_cierre(sesion):
         "cerrada_en": fecha_chile(sesion.cerrada_en),
         "cerrada_por_id": sesion.cerrada_por_id,
         "efectivo_contado": sesion.efectivo_contado,
+    }
+
+
+def fila_cierre(sesion):
+    resumen = sesion.resumen_cierre
+    return {
+        **datos_cierre(sesion),
+        "abierta_en": fecha_chile(sesion.abierta_en),
+        "abierta_por_id": sesion.abierta_por_id,
+        "abierta_por": sesion.abierta_por.get_username(),
+        "cerrada_por": sesion.cerrada_por.get_username(),
+        **{
+            campo: resumen[campo]
+            for campo in (
+                "total_vigente",
+                "cantidad_vigente",
+                "efectivo_esperado",
+                "diferencia",
+                "clasificacion",
+            )
+        },
     }
 
 
@@ -122,19 +171,31 @@ def movimiento(request, sesion_id, clave, datos):
 @endpoint_caja(caja.CERRAR_CAJA, escritura=True)
 def cerrar(request, sesion_id, clave, datos):
     resultado = caja.cerrar_caja(request.user, sesion_id, clave, datos)
-    return resultado_json(resultado, cierre_json(resultado.registro))
+    sesion = resultado.registro
+    respuesta = cierre_json(sesion)
+    if request.headers.get("X-Stockex-Account") and not request.user.has_perm(
+        caja.CONSULTAR_CIERRES
+    ):
+        respuesta["instantanea_html"] = render_to_string(
+            "inventario/caja/instantanea.html", contexto_cierre(sesion)
+        )
+    return resultado_json(resultado, respuesta)
+
+
+def cursor_pagina(request):
+    cursor = request.GET.get("antes_de")
+    if cursor is None:
+        return None
+    if len(cursor) > 19 or not cursor.isascii() or not cursor.isdecimal():
+        raise caja.ErrorCaja("cursor_invalido", "Envía un identificador de paginación.")
+    return int(cursor)
 
 
 @endpoint_caja(caja.CONSULTAR_CIERRES)
 def listar(request):
-    cursor = request.GET.get("antes_de")
-    if cursor is not None:
-        if len(cursor) > 19 or not cursor.isascii() or not cursor.isdecimal():
-            raise caja.ErrorCaja("cursor_invalido", "Envía un identificador de cierre.")
-        cursor = int(cursor)
-    cierres, siguiente = caja.listar_cierres(request.user, cursor)
+    cierres, siguiente = caja.listar_cierres(request.user, cursor_pagina(request))
     return JsonResponse(
-        {"cierres": [datos_cierre(sesion) for sesion in cierres], "antes_de": siguiente}
+        {"cierres": [fila_cierre(sesion) for sesion in cierres], "antes_de": siguiente}
     )
 
 

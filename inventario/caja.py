@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 from django.core.exceptions import PermissionDenied
 from django.db import OperationalError, transaction
@@ -12,7 +13,7 @@ from .bloqueo_caja import (
     sesion_activa,
     sqlite_ocupado,
 )
-from .historial_ventas import resumir_ventas
+from .historial_ventas import inicio_dia_chileno, resumir_ventas
 from .models import MovimientoCaja, SesionCaja
 from .peticion_financiera import uuid_v4
 
@@ -26,6 +27,7 @@ MAX_IMPORTE = 999_999_999_999
 MAX_CONTADO = 2**53 - 1
 MAX_ID = 2**63 - 1
 LIMITE_CIERRES = 50
+LIMITE_MOVIMIENTOS = 50
 
 
 class ErrorCaja(Exception):
@@ -105,7 +107,9 @@ def obtener_sesion(sesion_id, *, cerrada=False):
     entero(sesion_id, "sesion_id", 1, MAX_ID)
     sesiones = SesionCaja.objects.all()
     if cerrada:
-        sesiones = sesiones.filter(cerrada_en__isnull=False)
+        sesiones = sesiones.filter(cerrada_en__isnull=False).select_related(
+            "abierta_por", "cerrada_por"
+        )
     try:
         return sesiones.get(pk=sesion_id)
     except SesionCaja.DoesNotExist as error:
@@ -228,7 +232,7 @@ def resumir_caja(sesion):
 def consultar_caja(usuario):
     comprobar_permiso(usuario, CONSULTAR_CAJA)
     with transaccion_caja():
-        sesion = sesion_activa().first()
+        sesion = sesion_activa().select_related("abierta_por").first()
         return (sesion, resumir_caja(sesion)) if sesion is not None else (None, None)
 
 
@@ -294,23 +298,41 @@ def cerrar_caja(usuario, sesion_id, clave, datos):
         return ResultadoCaja(sesion)
 
 
-def listar_cierres(usuario, antes_de=None):
-    comprobar_permiso(usuario, CONSULTAR_CIERRES)
-    sesiones = SesionCaja.objects.filter(cerrada_en__isnull=False)
+def pagina_por_id(registros, antes_de, limite):
     if antes_de is not None:
         entero(antes_de, "antes_de", 1, MAX_ID)
-        sesiones = sesiones.filter(pk__lt=antes_de)
-    cierres = list(
-        sesiones.only("cerrada_en", "cerrada_por", "efectivo_contado").order_by("-pk")[
-            : LIMITE_CIERRES + 1
-        ]
+        registros = registros.filter(pk__lt=antes_de)
+    pagina = list(registros.order_by("-pk")[: limite + 1])
+    siguiente = pagina[limite - 1].pk if len(pagina) > limite else None
+    return pagina[:limite], siguiente
+
+
+def listar_cierres(usuario, antes_de=None, *, desde=None, hasta=None, clasificacion=""):
+    comprobar_permiso(usuario, CONSULTAR_CIERRES)
+    sesiones = SesionCaja.objects.filter(cerrada_en__isnull=False).select_related(
+        "abierta_por", "cerrada_por"
     )
-    siguiente = (
-        cierres[LIMITE_CIERRES - 1].pk if len(cierres) > LIMITE_CIERRES else None
-    )
-    return cierres[:LIMITE_CIERRES], siguiente
+    if desde:
+        sesiones = sesiones.filter(cerrada_en__gte=inicio_dia_chileno(desde))
+    if hasta and hasta < date.max:
+        sesiones = sesiones.filter(
+            cerrada_en__lt=inicio_dia_chileno(hasta + timedelta(days=1))
+        )
+    if clasificacion:
+        sesiones = sesiones.filter(resumen_cierre__clasificacion=clasificacion)
+    return pagina_por_id(sesiones, antes_de, LIMITE_CIERRES)
 
 
 def consultar_cierre(usuario, sesion_id):
     comprobar_permiso(usuario, CONSULTAR_CIERRES)
     return obtener_sesion(sesion_id, cerrada=True)
+
+
+def listar_movimientos(usuario, sesion_id, antes_de=None):
+    sesion = obtener_sesion(sesion_id)
+    permiso = CONSULTAR_CAJA if sesion.cerrada_en is None else CONSULTAR_CIERRES
+    comprobar_permiso(usuario, permiso)
+    movimientos, siguiente = pagina_por_id(
+        sesion.movimientos.select_related("usuario"), antes_de, LIMITE_MOVIMIENTOS
+    )
+    return sesion, movimientos, siguiente

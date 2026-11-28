@@ -21,14 +21,17 @@ const password = "Prueba-local-STK05A!";
 let django, chromiumLocal, origen;
 const fixture = `
 from datetime import timedelta
+from uuid import uuid4
 from django.contrib.auth.models import Group, User
 from django.core.management import call_command
 from django.utils.timezone import now
+from inventario.caja import abrir_caja
 from inventario.historial_ventas import limites_periodo
 from inventario.models import ItemVenta, Producto, Venta
 call_command("crear_grupos_permisos", verbosity=0)
 admin = User.objects.create_user("hist-admin", password="${password}")
 admin.groups.add(Group.objects.get(name="Administrador"))
+abrir_caja(admin, str(uuid4()), {"efectivo_inicial": 0})
 usuarios = [User.objects.create_user("hist-" + sufijo, password="${password}") for sufijo in ("a", "b")]
 for usuario in usuarios:
     usuario.groups.add(Group.objects.get(name="Vendedor"))
@@ -85,11 +88,19 @@ async function contexto(javaScriptEnabled = true) {
     return contexto;
 }
 
-async function login(page, usuario) {
+async function login(page, usuario, javaScriptEnabled = true) {
     await page.goto(origen + "/login/");
-    await page.locator("#id_username").fill(usuario);
-    await page.locator("#id_password").fill(password);
-    await Promise.all([page.waitForURL(url => url.pathname === "/"), page.locator('form button[type="submit"]').click()]);
+    if (javaScriptEnabled) {
+        await page.locator("#id_username").fill(usuario);
+        await page.locator("#id_password").fill(password);
+        await Promise.all([page.waitForURL(url => url.pathname === "/"), page.locator('form button[type="submit"]').click()]);
+    } else {
+        const csrfmiddlewaretoken = await page.locator('#main-content input[name="csrfmiddlewaretoken"]').getAttribute("value");
+        const respuesta = await page.request.post(origen + "/login/", {
+            form: {username: usuario, password, csrfmiddlewaretoken}, maxRedirects: 0,
+        });
+        assert.equal(respuesta.status(), 302);
+    }
     await page.goto(origen + "/ventas/");
     assert.equal(await page.locator("[data-historial]").count(), 1);
 }
@@ -225,7 +236,7 @@ try {
     console.log("OK historial y detalle en dos temas a 390, 768, 1366 y 1920 px");
 
     const sinJS = await (await contexto(false)).newPage();
-    await login(sinJS, "hist-a");
+    await login(sinJS, "hist-a", false);
     await sinJS.getByText("Ayer", {exact: true}).click();
     await sinJS.getByRole("button", {name: "Filtrar"}).click();
     assert.match(sinJS.url(), /periodo=ayer/);

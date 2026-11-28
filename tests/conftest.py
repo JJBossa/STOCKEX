@@ -6,6 +6,9 @@ from django.contrib.auth.models import User
 from inventario.models import Categoria, Producto
 import factory
 from factory.django import DjangoModelFactory
+from uuid import uuid4
+
+from inventario.caja import abrir_caja
 
 
 @pytest.fixture
@@ -18,6 +21,11 @@ def admin_user(db):
         is_staff=True,
         is_superuser=True
     )
+
+
+@pytest.fixture
+def caja_abierta(admin_user):
+    return abrir_caja(admin_user, str(uuid4()), {"efectivo_inicial": 0}).registro
 
 
 @pytest.fixture

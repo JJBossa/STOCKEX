@@ -6,7 +6,7 @@ from django.views.decorators.http import require_POST
 
 from .access import permiso_requerido
 from .bloqueo_caja import sqlite_ocupado
-from .peticion_financiera import ErrorJSON, leer_json
+from .peticion_financiera import ErrorJSON, comprobar_cuenta, leer_json
 from .registro_ventas import (
     PERMISO_REGISTRAR_VENTA,
     ErrorRegistroVenta,
@@ -19,6 +19,7 @@ from .registro_ventas import (
 @require_POST
 @csrf_protect
 def registrar_venta_pos(request):
+    comprobar_cuenta(request)
     try:
         datos = leer_json(request)
         resultado = registrar_venta(

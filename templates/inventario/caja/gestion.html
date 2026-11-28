@@ -1,0 +1,116 @@
+{% extends "inventario/caja/base.html" %}
+{% load static %}
+
+{% block title %}Caja - STOCKEX{% endblock %}
+
+{% block content %}
+<section class="caja-vista" data-gestion-caja data-cuenta="{{ request.user.pk }}"
+      data-resumen="{% url 'caja_gestion' %}?fragmento=resumen"
+      data-apertura="{% url 'caja_abrir' %}"
+      data-movimiento="{% url 'caja_movimiento' 0 %}" data-cierre="{% url 'caja_cerrar' 0 %}"
+      {% if perms.inventario.consultar_cierres_caja %}data-detalle="{% url 'caja_historial_detalle' 0 %}"{% endif %}>
+    <header class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Caja</h1>
+        <div class="d-flex flex-wrap gap-2" data-controles-accesibilidad>
+            <a class="btn btn-outline-secondary" id="caja-actualizar" href="{% url 'caja_gestion' %}">Actualizar</a>
+            {% if perms.inventario.consultar_cierres_caja %}
+            <a class="btn btn-outline-secondary" href="{% url 'caja_historial' %}">Historial de cierres</a>
+            {% endif %}
+        </div>
+    </header>
+    <noscript><p class="alert alert-warning">Habilita JavaScript para confirmar aperturas, movimientos y cierres. Las consultas están disponibles.</p></noscript>
+    <p id="caja-error" class="text-danger text-break" role="alert" tabindex="-1"></p>
+    <p id="caja-mensaje" class="text-success text-break" role="status" tabindex="-1"></p>
+    <section id="caja-pendientes" class="card border-warning mb-3" aria-labelledby="caja-titulo-pendientes" hidden>
+        <div class="card-body">
+            <h2 class="h5" id="caja-titulo-pendientes">Operaciones pendientes</h2>
+            <ul id="caja-pendientes-lista" class="list-unstyled mb-0"></ul>
+        </div>
+    </section>
+    <section id="caja-confirmado" class="card mb-3" hidden></section>
+    <div id="caja-resumen" class="mb-4">
+        {% include "inventario/caja/estado.html" %}
+    </div>
+    <div class="row g-3 align-items-start">
+        {% if perms.inventario.abrir_caja %}
+        <div class="col-lg-6" id="caja-apertura" {% if abierta %}hidden{% endif %}>
+            <section class="card" aria-labelledby="caja-titulo-apertura"><div class="card-body">
+                <h2 class="h5" id="caja-titulo-apertura">Apertura</h2>
+                <form data-operacion="apertura" method="post">
+                    <fieldset disabled>
+                        <label class="form-label" for="caja-inicial">Efectivo inicial (CLP)</label>
+                        <input class="form-control mb-3" type="text" inputmode="numeric" maxlength="20"
+                               id="caja-inicial" name="efectivo_inicial" data-maximo="{{ max_importe|stringformat:'d' }}" required>
+                        <label class="form-label" for="caja-observaciones-apertura">Observaciones (opcional)</label>
+                        <textarea class="form-control mb-3" id="caja-observaciones-apertura" name="observaciones" rows="2" maxlength="500"></textarea>
+                        <button class="btn btn-primary" type="submit">Abrir caja</button>
+                    </fieldset>
+                </form>
+            </div></section>
+        </div>
+        {% endif %}
+        {% if perms.inventario.consultar_caja and perms.inventario.registrar_movimiento_caja %}
+        <div class="col-lg-6" id="caja-movimiento" {% if not sesion %}hidden{% endif %}>
+            <section class="card" aria-labelledby="caja-titulo-movimiento"><div class="card-body">
+                <h2 class="h5" id="caja-titulo-movimiento">Ingresos y retiros</h2>
+                <p>Sesión <strong data-sesion>{{ sesion.pk|default:"" }}</strong></p>
+                <form data-operacion="movimiento" method="post">
+                    <fieldset disabled>
+                        <div class="row g-2 mb-3">
+                            <div class="col-sm-5">
+                                <label class="form-label" for="caja-tipo">Tipo</label>
+                                <select class="form-select" id="caja-tipo" name="tipo">
+                                    <option value="ingreso">Ingreso</option><option value="retiro">Retiro</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-7">
+                                <label class="form-label" for="caja-importe">Importe (CLP)</label>
+                                <input class="form-control" type="text" inputmode="numeric" maxlength="20"
+                                       id="caja-importe" name="importe" data-maximo="{{ max_importe|stringformat:'d' }}" required>
+                            </div>
+                        </div>
+                        <label class="form-label" for="caja-motivo">Motivo</label>
+                        <textarea class="form-control mb-3" id="caja-motivo" name="motivo" rows="2" maxlength="250" required></textarea>
+                        <button class="btn btn-primary" type="submit">Registrar movimiento</button>
+                    </fieldset>
+                </form>
+            </div></section>
+        </div>
+        {% endif %}
+        {% if perms.inventario.consultar_caja and perms.inventario.cerrar_caja %}
+        <div class="col-lg-6" id="caja-cierre" {% if not sesion %}hidden{% endif %}>
+            <section class="card" aria-labelledby="caja-titulo-cierre"><div class="card-body">
+                <h2 class="h5" id="caja-titulo-cierre">Conciliación y cierre</h2>
+                <p>Sesión <strong data-sesion>{{ sesion.pk|default:"" }}</strong></p>
+                <div id="caja-cambios" class="alert alert-warning" role="status" tabindex="-1" hidden>
+                    <p class="mb-1">El resumen cambió. Revisa las cifras y vuelve a confirmar el cierre.</p>
+                    <ul id="caja-diferencias" class="mb-0"></ul>
+                </div>
+                <form data-operacion="cierre" method="post">
+                    <fieldset disabled>
+                        <label class="form-label" for="caja-contado">Efectivo contado (CLP)</label>
+                        <input class="form-control" type="text" inputmode="numeric" maxlength="24"
+                               id="caja-contado" name="efectivo_contado" data-maximo="{{ max_contado|stringformat:'d' }}" required>
+                        <p class="my-2">Diferencia estimada <output id="caja-diferencia" for="caja-contado">—</output></p>
+                        <label class="form-label" for="caja-observaciones-cierre">Observaciones <span id="caja-observaciones-ayuda">(obligatorias si hay diferencia)</span></label>
+                        <textarea class="form-control mb-3" id="caja-observaciones-cierre" name="observaciones" rows="2" maxlength="500"></textarea>
+                        <button class="btn btn-outline-danger" type="submit">Revisar cierre</button>
+                    </fieldset>
+                </form>
+            </div></section>
+        </div>
+        <dialog id="caja-confirmacion" class="card shadow p-3 p-sm-4 mx-auto" aria-labelledby="caja-titulo-confirmacion">
+            <h2 class="h5" id="caja-titulo-confirmacion">Confirmar cierre</h2>
+            <p id="caja-confirmacion-importes"></p>
+            <p>El cierre es permanente y no admite reapertura. Las ventas de la sesión ya no podrán anularse y no se podrán agregar movimientos.</p>
+            <div class="d-flex justify-content-end flex-wrap gap-2">
+                <button class="btn btn-outline-secondary" type="button" id="caja-volver" autofocus>Volver</button>
+                <button class="btn btn-danger" type="button" id="caja-confirmar">Confirmar cierre</button>
+            </div>
+        </dialog>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}<script type="module" src="{% static 'js/caja.js' %}"></script>{% endblock %}

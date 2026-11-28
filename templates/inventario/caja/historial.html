@@ -1,0 +1,54 @@
+{% extends "inventario/caja/base.html" %}
+{% load tz ventas_tags %}
+{% block title %}Historial de cierres - STOCKEX{% endblock %}
+{% block content %}
+<section class="caja-vista">
+    <header data-controles-accesibilidad class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Historial de cierres</h1>
+        {% if perms.inventario.consultar_caja or perms.inventario.abrir_caja %}
+        <a class="btn btn-outline-secondary" href="{% url 'caja_gestion' %}">Caja actual</a>
+        {% endif %}
+    </header>
+    <form method="get" class="row g-2 align-items-end mb-3">
+        {% for campo in filtros %}
+        <div class="col-sm-4 col-lg-2">
+            <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            {{ campo }}
+            {% if campo.errors %}<div class="text-danger">{{ campo.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="col-auto"><button class="btn btn-primary" type="submit">Filtrar</button></div>
+        <div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'caja_historial' %}">Limpiar</a></div>
+        {% if filtros.non_field_errors %}<div class="text-danger">{{ filtros.non_field_errors }}</div>{% endif %}
+    </form>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Cierres registrados">
+        <table class="table table-sm align-middle">
+            <thead><tr>
+                <th scope="col">Sesión</th><th scope="col">Apertura</th><th scope="col">Cierre</th>
+                <th scope="col" class="text-end">Total vendido</th><th scope="col" class="text-end">Ventas</th>
+                <th scope="col" class="text-end">Efectivo esperado</th><th scope="col" class="text-end">Efectivo contado</th>
+                <th scope="col" class="text-end">Diferencia</th><th scope="col">Clasificación</th>
+            </tr></thead>
+            <tbody>
+                {% timezone "America/Santiago" %}
+                {% for sesion in cierres %}
+                <tr>
+                    <th scope="row"><a href="{% url 'caja_historial_detalle' sesion.pk %}">#{{ sesion.pk }}<span class="visually-hidden"> · ver cierre</span></a></th>
+                    <td><time class="text-nowrap" datetime="{{ sesion.abierta_en|date:'c' }}">{{ sesion.abierta_en|date:"d/m/Y H:i" }}</time><br>{{ sesion.abierta_por.get_username }}</td>
+                    <td><time class="text-nowrap" datetime="{{ sesion.cerrada_en|date:'c' }}">{{ sesion.cerrada_en|date:"d/m/Y H:i" }}</time><br>{{ sesion.cerrada_por.get_username }}</td>
+                    <td class="text-end">{{ sesion.resumen_cierre.total_vigente|clp }}</td>
+                    <td class="text-end">{{ sesion.resumen_cierre.cantidad_vigente }}</td>
+                    <td class="text-end">{{ sesion.resumen_cierre.efectivo_esperado|clp }}</td>
+                    <td class="text-end">{{ sesion.efectivo_contado|clp }}</td>
+                    <td class="text-end">{{ sesion.resumen_cierre.diferencia|clp }}</td>
+                    <td>{% with clasificacion=sesion.resumen_cierre.clasificacion %}{% if clasificacion == "cuadrada" %}Caja cuadrada{% else %}{{ clasificacion|capfirst }}{% endif %}{% endwith %}</td>
+                </tr>
+                {% empty %}<tr><td colspan="9">No hay cierres para esta consulta.</td></tr>
+                {% endfor %}
+                {% endtimezone %}
+            </tbody>
+        </table>
+    </div>
+    {% if siguiente %}<a class="btn btn-outline-secondary" href="{{ siguiente }}">Cierres anteriores</a>{% endif %}
+</section>
+{% endblock %}

@@ -1,6 +1,14 @@
 import json
 from uuid import UUID
 
+from django.core.exceptions import PermissionDenied
+
+
+def comprobar_cuenta(request):
+    cuenta = request.headers.get("X-Stockex-Account")
+    if cuenta is not None and cuenta != str(request.user.pk):
+        raise PermissionDenied
+
 
 class ErrorJSON(Exception):
     def __init__(self, codigo, estado):

@@ -4,6 +4,7 @@ from .views_importacion_productos import importar_productos_excel
 from .views_registro_ventas import registrar_venta_pos
 from . import views
 from . import views_caja
+from . import views_gestion_caja
 from . import views_extra
 from . import views_facturas
 from . import views_usuarios
@@ -33,6 +34,19 @@ from . import views_reportes_programados
 urlpatterns = [
     path("api/catalogo-productos/", catalogo_productos, name="catalogo_productos"),
     path("pos/registrar-venta/", registrar_venta_pos, name="registrar_venta_pos"),
+    path("pos/estado-caja/", views_pos.estado_caja_pos, name="pos_estado_caja"),
+    path("caja/", views_gestion_caja.gestion, name="caja_gestion"),
+    path("caja/historial/", views_gestion_caja.historial, name="caja_historial"),
+    path(
+        "caja/historial/<int:sesion_id>/",
+        views_gestion_caja.detalle,
+        name="caja_historial_detalle",
+    ),
+    path(
+        "caja/<int:sesion_id>/movimientos/listado/",
+        views_gestion_caja.movimientos,
+        name="caja_listado_movimientos",
+    ),
     path("caja/activa/", views_caja.activa, name="caja_activa"),
     path("caja/abrir/", views_caja.apertura, name="caja_abrir"),
     path(

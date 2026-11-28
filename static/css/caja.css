@@ -1,0 +1,50 @@
+#caja-confirmacion:not([open]) {
+    display: none;
+}
+
+#caja-confirmacion {
+    width: min(32rem, calc(100% - 2rem));
+    max-height: calc(100% - 2rem);
+    overflow-y: auto;
+}
+
+#caja-confirmacion::backdrop {
+    background: rgb(0 0 0 / 65%);
+}
+
+[data-gestion-caja] [hidden] {
+    display: none !important;
+}
+
+#caja-diferencia {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.caja-vista #accesibilidad-controls {
+    position: static !important;
+}
+
+body.dark-mode .caja-vista .table {
+    --bs-table-bg: #2d2d2d;
+    --bs-table-color: #e0e0e0;
+    --bs-table-border-color: #4a4a4a;
+}
+
+body.dark-mode .caja-vista .btn-outline-primary {
+    --bs-btn-color: #a5b4fc;
+    --bs-btn-border-color: #a5b4fc;
+}
+
+body.dark-mode .caja-vista .btn-outline-danger {
+    --bs-btn-color: #ff9fa8;
+    --bs-btn-border-color: #ff9fa8;
+}
+
+body.dark-mode .caja-vista .text-danger {
+    color: #ff9fa8 !important;
+}
+
+body.dark-mode .caja-vista .text-success {
+    color: #85d6a0 !important;
+}
