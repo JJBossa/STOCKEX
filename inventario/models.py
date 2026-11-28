@@ -381,6 +381,13 @@ class Venta(models.Model):
     modalidad = models.CharField(
         max_length=10, choices=Modalidad.choices, null=True, blank=True
     )
+    sesion_caja = models.ForeignKey(
+        "SesionCaja",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ventas",
+    )
     cliente = models.ForeignKey(
         "Cliente",
         on_delete=models.PROTECT,
@@ -1642,5 +1649,112 @@ class AnulacionVenta(models.Model):
         constraints = (
             models.CheckConstraint(
                 condition=~models.Q(motivo=""), name="anulacion_venta_motivo_no_vacio"
+            ),
+        )
+
+
+class BloqueoCaja(models.Model):
+    """Fila común a todas las operaciones, incluso en ausencia de una sesión."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+
+    class Meta:
+        default_permissions = ()
+        constraints = (
+            models.CheckConstraint(condition=models.Q(id=1), name="caja_bloqueo_unico"),
+        )
+
+
+class SesionCaja(models.Model):
+    abierta_en = models.DateTimeField(auto_now_add=True)
+    abierta_por = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="cajas_abiertas"
+    )
+    efectivo_inicial = models.PositiveBigIntegerField()
+    observaciones_apertura = models.CharField(max_length=500, blank=True)
+    clave_apertura = models.UUIDField()
+    version_resumen = models.UUIDField(default=uuid.uuid4, editable=False)
+
+    cerrada_en = models.DateTimeField(null=True)
+    cerrada_por = models.ForeignKey(
+        User, on_delete=models.PROTECT, null=True, related_name="cajas_cerradas"
+    )
+    efectivo_contado = models.PositiveBigIntegerField(null=True)
+    observaciones_cierre = models.CharField(max_length=500, blank=True)
+    clave_cierre = models.UUIDField(null=True)
+    resumen_cierre = models.JSONField(null=True)
+
+    class Meta:
+        default_permissions = ()
+        permissions = (
+            ("consultar_caja", "Puede consultar la caja activa"),
+            ("abrir_caja", "Puede abrir caja"),
+            ("registrar_movimiento_caja", "Puede registrar ingresos y retiros de caja"),
+            ("cerrar_caja", "Puede cerrar caja"),
+            ("consultar_cierres_caja", "Puede consultar cierres históricos de caja"),
+        )
+        constraints = (
+            models.UniqueConstraint(
+                models.Value(1),
+                condition=models.Q(cerrada_en__isnull=True),
+                name="caja_una_sesion_abierta",
+            ),
+            models.UniqueConstraint(
+                fields=["abierta_por", "clave_apertura"],
+                name="caja_clave_apertura_unica",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        cerrada_en__isnull=True,
+                        cerrada_por__isnull=True,
+                        efectivo_contado__isnull=True,
+                        observaciones_cierre="",
+                        clave_cierre__isnull=True,
+                        resumen_cierre__isnull=True,
+                    )
+                    | models.Q(
+                        cerrada_en__isnull=False,
+                        cerrada_por__isnull=False,
+                        efectivo_contado__isnull=False,
+                        clave_cierre__isnull=False,
+                        resumen_cierre__isnull=False,
+                    )
+                ),
+                name="caja_datos_cierre_coherentes",
+            ),
+        )
+
+
+class MovimientoCaja(models.Model):
+    class Tipo(models.TextChoices):
+        INGRESO = "ingreso", "Ingreso"
+        RETIRO = "retiro", "Retiro"
+
+    sesion = models.ForeignKey(
+        SesionCaja, on_delete=models.PROTECT, related_name="movimientos"
+    )
+    tipo = models.CharField(max_length=7, choices=Tipo.choices)
+    importe = models.PositiveBigIntegerField()
+    motivo = models.CharField(max_length=250)
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    fecha = models.DateTimeField(auto_now_add=True)
+    clave = models.UUIDField()
+
+    class Meta:
+        default_permissions = ()
+        constraints = (
+            models.UniqueConstraint(
+                fields=["sesion", "clave"], name="caja_movimiento_clave_unica"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(importe__gt=0), name="caja_movimiento_positivo"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(motivo=""), name="caja_movimiento_con_motivo"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tipo__in=["ingreso", "retiro"]),
+                name="caja_movimiento_tipo_valido",
             ),
         )

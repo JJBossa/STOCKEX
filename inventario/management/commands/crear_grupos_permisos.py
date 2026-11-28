@@ -21,6 +21,15 @@ ADMINISTRADOR = {
     },
 }
 ADMINISTRADOR["inventario"].add("anular_venta")
+ADMINISTRADOR["inventario"].update(
+    {
+        "consultar_caja",
+        "abrir_caja",
+        "registrar_movimiento_caja",
+        "cerrar_caja",
+        "consultar_cierres_caja",
+    }
+)
 
 
 class Command(BaseCommand):

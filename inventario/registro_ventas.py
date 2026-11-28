@@ -1,12 +1,13 @@
 import hashlib
 import json
 from dataclasses import dataclass
-from uuid import UUID
 
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 
+from .bloqueo_caja import bloquear_caja, invalidar_resumen, sesion_activa
 from .models import ItemVenta, Producto, RegistroVenta, Venta
+from .peticion_financiera import uuid_v4
 
 PERMISO_REGISTRAR_VENTA = "inventario.registrar_venta"
 MAX_MONTO = 999_999_999_999
@@ -42,21 +43,12 @@ def entero_positivo(valor, campo, maximo):
 
 
 def normalizar_clave(clave):
-    if not isinstance(clave, str) or len(clave) != 36:
-        raise ErrorRegistroVenta(
-            "clave_invalida", "Envía un UUID v4 en Idempotency-Key."
-        )
     try:
-        uuid = UUID(clave)
+        return uuid_v4(clave)
     except ValueError as error:
         raise ErrorRegistroVenta(
             "clave_invalida", "Envía un UUID v4 en Idempotency-Key."
         ) from error
-    if uuid.version != 4 or str(uuid) != clave.lower():
-        raise ErrorRegistroVenta(
-            "clave_invalida", "Envía un UUID v4 en Idempotency-Key."
-        )
-    return uuid
 
 
 def normalizar_items(datos):
@@ -211,11 +203,13 @@ def registrar_venta(usuario, clave, datos):
     reserva_creada = False
     try:
         with transaction.atomic():
-            # La reserva es la primera operación SQL. La unicidad arbitra los envíos simultáneos.
+            bloquear_caja()
             registro = RegistroVenta.objects.create(
                 usuario=usuario, clave=clave, huella=huella
             )
             reserva_creada = True
+            # Compatibilidad STK-06A: el POS aún puede registrar sin sesión abierta.
+            sesion_id = sesion_activa().values_list("pk", flat=True).first()
             items = (
                 preparar_items(datos["items"])
                 if modalidad == Venta.Modalidad.DETALLADA
@@ -232,6 +226,7 @@ def registrar_venta(usuario, clave, datos):
             )
             venta = Venta.objects.create(
                 usuario=usuario,
+                sesion_caja_id=sesion_id,
                 modalidad=modalidad,
                 subtotal=total,
                 total=total,
@@ -245,6 +240,8 @@ def registrar_venta(usuario, clave, datos):
                 ItemVenta.objects.bulk_create(items)
             registro.venta = venta
             registro.save(update_fields=["venta"])
+            if sesion_id is not None:
+                invalidar_resumen(sesion_id)
             return ResultadoRegistroVenta(venta, items)
     except IntegrityError:
         if reserva_creada:

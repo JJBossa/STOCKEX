@@ -1,31 +1,17 @@
-import json
-import sqlite3
-
-from django.db import OperationalError, connection
+from django.db import OperationalError
 from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
 
 from .access import permiso_requerido
+from .bloqueo_caja import sqlite_ocupado
+from .peticion_financiera import ErrorJSON, leer_json
 from .registro_ventas import (
     PERMISO_REGISTRAR_VENTA,
     ErrorRegistroVenta,
     registrar_venta,
 )
-
-MAX_PAYLOAD = 16 * 1024
-
-
-def objeto_json(pares):
-    objeto = dict(pares)
-    if len(objeto) != len(pares):
-        raise ValueError("Propiedad JSON duplicada.")
-    return objeto
-
-
-def constante_invalida(valor):
-    raise ValueError(f"Constante JSON inválida: {valor}")
 
 
 @never_cache
@@ -33,32 +19,17 @@ def constante_invalida(valor):
 @require_POST
 @csrf_protect
 def registrar_venta_pos(request):
-    if request.content_type != "application/json":
-        return JsonResponse({"error": "tipo_de_contenido_invalido"}, status=415)
-    cuerpo = request.read(MAX_PAYLOAD + 1)
-    if len(cuerpo) > MAX_PAYLOAD:
-        return JsonResponse({"error": "payload_demasiado_grande"}, status=413)
     try:
-        datos = json.loads(
-            cuerpo.decode("utf-8"),
-            object_pairs_hook=objeto_json,
-            parse_constant=constante_invalida,
-        )
-    except (ValueError, RecursionError):
-        return JsonResponse({"error": "json_invalido"}, status=400)
-
-    try:
+        datos = leer_json(request)
         resultado = registrar_venta(
             request.user, request.headers.get("Idempotency-Key"), datos
         )
+    except ErrorJSON as error:
+        return JsonResponse({"error": error.codigo}, status=error.estado)
     except ErrorRegistroVenta as error:
         return JsonResponse(error.datos, status=error.estado)
     except OperationalError as error:
-        codigo = getattr(error.__cause__, "sqlite_errorcode", 0)
-        if connection.vendor != "sqlite" or (codigo & 0xFF) not in (
-            sqlite3.SQLITE_BUSY,
-            sqlite3.SQLITE_LOCKED,
-        ):
+        if not sqlite_ocupado(error):
             raise
         return JsonResponse(
             {"error": "registro_temporalmente_ocupado"},
